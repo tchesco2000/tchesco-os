@@ -124,7 +124,7 @@ main() {
 
     # ── Módulos ativos (adicionar aqui conforme cada fase for concluída) ──────
     run_module "$MODULES_DIR/01-base.sh"
-    # run_module "$MODULES_DIR/02-theme.sh"      # Fase 3
+    run_module "$MODULES_DIR/02-theme.sh"
     # run_module "$MODULES_DIR/02b-i18n.sh"      # Fase 3.5
     # run_module "$MODULES_DIR/03-dev.sh"        # Fase 4
     # run_module "$MODULES_DIR/04-gaming.sh"     # Fase 5
