@@ -635,7 +635,7 @@ thickness=44
 
 [PlasmaViews][Panel 50]
 floating=0
-panelLengthMode=1
+panelLengthMode=0
 panelVisibility=1
 
 [PlasmaViews][Panel 50][Defaults]
@@ -714,8 +714,8 @@ alignment=132
 formfactor=2
 immutability=1
 lastScreen=0
-lengthMode=2
 location=4
+panelVisibility=1
 plugin=org.kde.panel
 wallpaperplugin=org.kde.image
 
