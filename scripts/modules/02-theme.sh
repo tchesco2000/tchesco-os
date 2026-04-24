@@ -269,6 +269,12 @@ apply_kde_config() {
     as_user kwriteconfig6 --file kwinrc \
         --group Plugins --key fadeEnabled "true"
 
+    # Desabilita override automático de tema do Kubuntu (causa crítica de nada mudar)
+    as_user kwriteconfig6 --file kdeglobals \
+        --group KDE --key AutomaticLookAndFeel "false"
+    as_user kwriteconfig6 --file kdeglobals \
+        --group KDE --key LookAndFeelPackage "com.github.vinceliuice.WhiteSur"
+
     # Tema GTK (para apps GTK dentro do KDE)
     mkdir -p "$REAL_HOME/.config/gtk-3.0" "$REAL_HOME/.config/gtk-4.0"
     chown "$REAL_USER:$REAL_USER" "$REAL_HOME/.config/gtk-3.0" "$REAL_HOME/.config/gtk-4.0"
@@ -323,56 +329,77 @@ install_tchesco_icon() {
 }
 
 configure_top_panel() {
-    step "Configurando barra superior estilo macOS"
+    step "Configurando painéis estilo macOS (Wayland-compatible)"
 
     local icon_path="$REAL_HOME/.local/share/icons/hicolor/scalable/apps/tchesco.svg"
     local script_path="$REAL_HOME/.local/bin/tchesco-panel-setup.sh"
     local flag_path="$REAL_HOME/.tchesco-panel-done"
     local autostart_path="$REAL_HOME/.config/autostart/tchesco-panel-setup.desktop"
 
+    # Remove Plank do autostart — não funciona em Wayland (Kubuntu 26.04 padrão)
+    rm -f "$REAL_HOME/.config/autostart/plank.desktop" 2>/dev/null || true
+
     as_user mkdir -p "$REAL_HOME/.local/bin"
 
-    # Escreve o script com heredoc literal e injeta os paths via sed
+    # Reseta flag para o script rodar novamente com a configuração atualizada
+    rm -f "$flag_path" 2>/dev/null || true
+
+    # Escreve script com heredoc literal (sem expansão) + sed injeta os paths
     cat > "$script_path" << 'PANEL_EOF'
 #!/bin/bash
-# Configura painel macOS estilo Tchesco OS — executa uma vez no login
+# Configura painéis macOS estilo Tchesco OS — executa uma vez no login
 FLAG="__FLAG_PATH__"
 [[ -f "$FLAG" ]] && exit 0
 
-# Aguarda o Plasma carregar (máximo 60s)
+# Aguarda Plasma carregar completamente (máximo 60s)
 for i in $(seq 1 30); do
     qdbus org.kde.plasmashell /PlasmaShell 2>/dev/null && break
     sleep 2
 done
 
+# 1. Desabilita override de tema automático do Kubuntu
+kwriteconfig6 --file kdeglobals --group KDE --key AutomaticLookAndFeel false
+
+# 2. Aplica tema WhiteSur globalmente
+plasma-apply-lookandfeel --apply com.github.vinceliuice.WhiteSur 2>/dev/null || true
+sleep 3
+
+# 3. Cria painéis via Plasma JS API (funciona em Wayland e X11)
 qdbus org.kde.plasmashell /PlasmaShell evaluateScript "
-// Remove painel inferior padrão do Kubuntu (substitui pelo Plank)
-panels().forEach(function(p) {
-    if (p.location === 'bottom') p.remove()
-})
+// Remove todos os painéis existentes (painel padrão Kubuntu)
+panels().forEach(function(p) { p.remove() })
 
-// Cria barra superior estilo macOS
-var panel = new Panel
-panel.location = 'top'
-panel.height = 28
-panel.hiding = 'none'
+// ── BARRA SUPERIOR estilo macOS ──────────────────────────────────
+var top = new Panel
+top.location = 'top'
+top.height = 28
+top.hiding = 'none'
 
-// Botão do sistema com ícone Tchesco (substitui a maçã do macOS)
-var launcher = panel.addWidget('org.kde.plasma.kickoff')
+// Logo Tchesco no lugar da maçã
+var launcher = top.addWidget('org.kde.plasma.kickoff')
 launcher.currentConfigGroup = ['General']
 launcher.writeConfig('icon', '__ICON_PATH__')
 
-// Global Menu — menus da app ativa aparecem na barra superior
-panel.addWidget('org.kde.plasma.appmenu')
+// Global Menu: menus da app ativa aparecem na barra, igual ao macOS
+top.addWidget('org.kde.plasma.appmenu')
+top.addWidget('org.kde.plasma.panelspacer')
+top.addWidget('org.kde.plasma.systemtray')
+top.addWidget('org.kde.plasma.digitalclock')
 
-// Espaçador central empurra relógio e bandeja para a direita
-panel.addWidget('org.kde.plasma.panelspacer')
+// ── DOCK CENTRALIZADO estilo macOS ───────────────────────────────
+// KDE Plasma 6 nativo: funciona em Wayland, suporta flutuante e centralizado
+var dock = new Panel
+dock.location = 'bottom'
+dock.height = 72
+dock.hiding = 'dodgewindows'
+dock.alignment = 'center'
+dock.lengthMode = 'fit'
 
-// Bandeja do sistema (Wi-Fi, volume, bateria)
-panel.addWidget('org.kde.plasma.systemtray')
-
-// Relógio
-panel.addWidget('org.kde.plasma.digitalclock')
+// Icon-only Task Manager (igual ao Dock do macOS)
+var tasks = dock.addWidget('org.kde.plasma.icontasks')
+tasks.currentConfigGroup = ['General']
+tasks.writeConfig('launchers', 'applications:org.kde.dolphin.desktop,applications:org.kde.konsole.desktop,applications:systemsettings.desktop,applications:org.kde.kate.desktop')
+tasks.writeConfig('iconSpacing', '1')
 " 2>/dev/null
 
 touch "$FLAG"
@@ -394,7 +421,7 @@ X-GNOME-Autostart-enabled=true
 EOF
     chown "$REAL_USER:$REAL_USER" "$autostart_path"
 
-    ok "Barra superior configurada — será criada no próximo login"
+    ok "Painéis configurados — barra top + dock macOS no próximo login"
 }
 
 configure_plank() {
