@@ -89,6 +89,16 @@ init_log() {
 
 # ─── Funções principais ───────────────────────────────────────────────────────
 
+cleanup_broken_ppas() {
+    # Remove PPAs inválidos antes de qualquer apt update para evitar falha com código 100.
+    # Necessário porque add-apt-repository não valida disponibilidade antes de adicionar.
+    if ls /etc/apt/sources.list.d/*kisak* &>/dev/null 2>&1; then
+        warn "Removendo entrada inválida do kisak-mesa (sem suporte para esta versão do Ubuntu)..."
+        rm -f /etc/apt/sources.list.d/*kisak* 2>/dev/null || true
+        log "Entrada kisak-mesa removida"
+    fi
+}
+
 update_system() {
     step "Atualizando o sistema"
 
@@ -304,6 +314,7 @@ main() {
     check_root
     check_ubuntu
     check_internet
+    cleanup_broken_ppas
     update_system
     add_ppas
     install_base_packages
