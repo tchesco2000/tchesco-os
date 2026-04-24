@@ -112,22 +112,26 @@ Desenvolvimento em fases incrementais, cada uma validada na VM antes de avançar
 - [x] CoreCtrl + polkit rule (controle de GPU sem senha root)
 - [x] `gamemode.ini` com perfil `performance`
 
-### Fase 6 — Script v0.5: Pilar Office ⏳ PRÓXIMA
+### Fase 6 — Script v0.5: Pilar Office ✅ CONCLUÍDA
 
 `scripts/modules/05-office.sh`
 
-- [ ] LibreOffice completo com integração KDE
-- [ ] OnlyOffice (repo oficial)
-- [ ] VLC, MPV
-- [ ] GIMP, Inkscape, Krita
-- [ ] Kdenlive
-- [ ] OBS Studio
-- [ ] Spotify (Flatpak)
-- [ ] Telegram, Discord (Flatpak)
-- [ ] CUPS + SANE + Simple Scan
-- [ ] Timeshift (backup)
+> Decisões tomadas durante execução:
+> - **OnlyOffice via Flatpak** — mais simples que repositório oficial (evita EULA interativa)
+> - **OBS via apt** — disponível no Ubuntu 26.04 universe (sem necessidade de Flatpak)
 
-### Fase 7 — Script v0.6: Compatibilidade Windows ⏳
+- [x] LibreOffice + l10n-pt-br + help-pt-br + Qt6 (integração KDE)
+- [x] Fontes Microsoft (ttf-mscorefonts) + ubuntu-restricted-extras (codecs)
+- [x] OnlyOffice Desktop (Flatpak)
+- [x] VLC, MPV
+- [x] GIMP, Inkscape, Krita
+- [x] Kdenlive
+- [x] OBS Studio (apt)
+- [x] Spotify, Telegram, Discord (Flatpak)
+- [x] CUPS + cups-browsed + SANE + Simple Scan + printer-driver-all
+- [x] Timeshift (backup)
+
+### Fase 7 — Script v0.6: Compatibilidade Windows ⏳ PRÓXIMA
 
 `scripts/modules/06-wine.sh`
 
