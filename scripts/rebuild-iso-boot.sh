@@ -39,6 +39,12 @@ mkdir -p "$BUILD_DIR/casper"
 rsync -a --exclude="casper/filesystem.squashfs" /mnt/kub-iso/ "$BUILD_DIR/"
 echo "rsync: $(du -sh "$BUILD_DIR" | cut -f1)"
 
+echo "[4b] Corrigindo textos do GRUB..."
+sed -i 's/Try or Install Kubuntu/Try or Install Tchesco OS/g' "$BUILD_DIR/boot/grub/grub.cfg"
+sed -i 's/Kubuntu (safe graphics)/Tchesco OS (safe graphics)/g' "$BUILD_DIR/boot/grub/grub.cfg"
+sed -i 's/Try or Install Kubuntu/Try or Install Tchesco OS/g' "$BUILD_DIR/boot/grub/loopback.cfg" 2>/dev/null || true
+sed -i 's/Kubuntu (safe graphics)/Tchesco OS (safe graphics)/g' "$BUILD_DIR/boot/grub/loopback.cfg" 2>/dev/null || true
+
 echo "[5/6] Copiando squashfs Tchesco (5.9GB)..."
 cp /mnt/boot-iso/casper/filesystem.squashfs "$BUILD_DIR/casper/filesystem.squashfs"
 echo "squashfs: $(ls -lh "$BUILD_DIR/casper/filesystem.squashfs" | awk '{print $5}')"
