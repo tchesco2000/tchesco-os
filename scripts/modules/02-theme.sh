@@ -283,7 +283,8 @@ apply_kde_config() {
     done
 
     # Gera background escuro Tchesco (substitui wallpaper macOS Monterey)
-    python3 - << 'PYEOF'
+    # REAL_HOME passado via env pois o Python roda como root e ~ resolveria para /root
+    REAL_HOME="$REAL_HOME" python3 - << 'PYEOF'
 from PIL import Image
 import os, shutil
 
@@ -310,10 +311,13 @@ for y in range(h):
 
 bg = "/tmp/tchesco-splash-bg.png"
 img.save(bg)
-base = os.path.expanduser("~/.local/share/plasma/look-and-feel")
+# HOME do usuário real passado via variável de ambiente (script roda como root)
+import os as _os
+real_home = _os.environ.get("REAL_HOME", _os.path.expanduser("~"))
+base = _os.path.join(real_home, ".local/share/plasma/look-and-feel")
 for v in ["WhiteSur", "WhiteSur-alt", "WhiteSur-dark"]:
-    dest = os.path.join(base, f"com.github.vinceliuice.{v}/contents/splash/images/background.png")
-    os.path.exists(os.path.dirname(dest)) and shutil.copy(bg, dest)
+    dest = _os.path.join(base, f"com.github.vinceliuice.{v}/contents/splash/images/background.png")
+    _os.path.exists(_os.path.dirname(dest)) and shutil.copy(bg, dest)
 PYEOF
 
     # Mantém o ksplash WhiteSur ativo (agora com logo Tchesco e fundo Tchesco)
