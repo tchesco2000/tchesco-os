@@ -176,10 +176,7 @@ class TchecoWelcome(QWidget):
 
     def _launch_installer(self):
         self.close()
-        subprocess.Popen(
-            ["calamares"],
-            env={**os.environ, "DISPLAY": os.environ.get("DISPLAY", ":0")}
-        )
+        subprocess.Popen(["pkexec", "calamares"])
 
 
 def main():

@@ -159,6 +159,35 @@ if [[ -f "$CALAMARES_CONF" ]]; then
     log "  Calamares: branding tchesco aplicado"
 fi
 
+## 5g. Calamares welcome.conf — appName/appVersion (Bug 14)
+log "  5g. Corrigindo Calamares welcome.conf..."
+for conf in "$FS_DIR/usr/share/calamares/modules/welcome.conf" \
+            "$FS_DIR/etc/calamares/modules/welcome.conf"; do
+    if [[ -f "$conf" ]]; then
+        sed -i 's/appName:.*/appName: "Tchesco OS"/' "$conf"
+        sed -i 's/appVersion:.*/appVersion: "1.0"/' "$conf"
+        log "    Atualizado: $conf"
+    fi
+done
+
+## 5h. Plank autostart — força XDG_SESSION_TYPE=x11 (Bug 16)
+log "  5h. Corrigindo Plank autostart..."
+for plank_desk in "$FS_DIR/home/ubuntu/.config/autostart/plank.desktop" \
+                  "$FS_DIR/etc/skel/.config/autostart/plank.desktop"; do
+    if [[ -f "$plank_desk" ]]; then
+        sed -i 's|^Exec=plank.*|Exec=env XDG_SESSION_TYPE=x11 DESKTOP_SESSION=plasmax11 plank|' "$plank_desk"
+        log "    Corrigido: $plank_desk"
+    fi
+done
+
+## 5i. calamares.desktop — renomeia entrada de menu (Bug 17)
+log "  5i. Renomeando entrada de menu do Calamares..."
+CAL_DESK="$FS_DIR/usr/share/applications/calamares.desktop"
+if [[ -f "$CAL_DESK" ]]; then
+    sed -i 's/Install Kubuntu[^=]*/Instalar Tchesco OS/g' "$CAL_DESK"
+    log "    calamares.desktop atualizado"
+fi
+
 # ─── 6. Corrige Plymouth no initrd ────────────────────────────────────────────
 log "[6/9] Corrigindo Plymouth no initrd..."
 
