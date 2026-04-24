@@ -387,26 +387,73 @@ install_tchesco_icon() {
 setup_global_menu() {
     step "Configurando Global Menu (menus da app no topo)"
 
-    # GTK_MODULES em /etc/environment (sistema) garante que processos iniciados
-    # pelo Plasma (via .desktop) também recebem a env var — não só sessões systemd-user.
+    # GTK_MODULES precisa chegar aos processos via múltiplos caminhos:
+    # 1) /etc/profile.d/*.sh — login shells (sh, bash)
+    # 2) ~/.config/plasma-workspace/env/*.sh — Plasma startup (Wayland)
+    # 3) /etc/environment — fallback para sistemas que leem (limitado)
+    # NÃO usar só ~/.config/environment.d — Plasma Wayland ignora esse caminho.
+
+    cat > /etc/profile.d/tchesco-gtk-modules.sh << 'EOF'
+export GTK_MODULES=appmenu-gtk-module
+EOF
+    chmod +x /etc/profile.d/tchesco-gtk-modules.sh
+
+    local plasma_env="$REAL_HOME/.config/plasma-workspace/env"
+    as_user mkdir -p "$plasma_env"
+    cat > "$plasma_env/gtk-modules.sh" << 'EOF'
+#!/bin/sh
+export GTK_MODULES=appmenu-gtk-module
+EOF
+    chmod +x "$plasma_env/gtk-modules.sh"
+    chown -R "$REAL_USER:$REAL_USER" "$REAL_HOME/.config/plasma-workspace"
+
     if ! grep -q "^GTK_MODULES" /etc/environment 2>/dev/null; then
         echo "GTK_MODULES=appmenu-gtk-module" >> /etc/environment
     fi
-
-    # Mantém também em ~/.config/environment.d (sessão Wayland do KDE)
-    local env_dir="$REAL_HOME/.config/environment.d"
-    as_user mkdir -p "$env_dir"
-    cat > "$env_dir/appmenu.conf" << 'EOF'
-GTK_MODULES=appmenu-gtk-module
-UBUNTU_MENUPROXY=1
-EOF
-    chown "$REAL_USER:$REAL_USER" "$env_dir/appmenu.conf"
 
     # Garante que appmenu-gtk3-module está instalado
     dpkg -s appmenu-gtk3-module &>/dev/null 2>&1 || \
         DEBIAN_FRONTEND=noninteractive apt-get install -y -qq appmenu-gtk3-module >> "$LOG_FILE" 2>&1
 
-    ok "Global Menu configurado (apps GTK e Qt exportam menus)"
+    ok "Global Menu configurado em /etc/profile.d + plasma-workspace/env"
+}
+
+replace_whitesur_apple_wallpapers() {
+    step "Substituindo wallpapers macOS do WhiteSur por Tchesco escuro"
+
+    # WhiteSur/contents/logout/Logout.qml usa wallpapers/WhiteSur-*/contents/images/*.jpg
+    # como fundo da tela de logout. Esses JPGs são o wallpaper macOS Monterey (rosa/laranja).
+    # Substituímos por um gradiente escuro Tchesco.
+
+    REAL_HOME="$REAL_HOME" python3 - << 'PYEOF' >> "$LOG_FILE" 2>&1
+from PIL import Image
+import os, glob, shutil
+
+real_home = os.environ.get("REAL_HOME", os.path.expanduser("~"))
+
+w, h = 3840, 2160
+img = Image.new("RGBA", (w, h))
+px = img.load()
+for y in range(h):
+    for x in range(w):
+        rx, ry = x / w, y / h
+        r = min(30, int(10 + rx * 3 + ry * 5))
+        g = min(52, int(17 + rx * 15 + ry * 20))
+        b = min(98, int(40 + rx * 30 + ry * 28))
+        px[x, y] = (r, g, b, 255)
+
+tmp = "/tmp/tchesco-wallpaper.jpg"
+img.convert("RGB").save(tmp, "JPEG", quality=90)
+
+wp_root = os.path.join(real_home, ".local/share/wallpapers")
+for wp_dir in glob.glob(os.path.join(wp_root, "WhiteSur*")):
+    img_dir = os.path.join(wp_dir, "contents", "images")
+    if os.path.isdir(img_dir):
+        for img_file in os.listdir(img_dir):
+            shutil.copy(tmp, os.path.join(img_dir, img_file))
+PYEOF
+
+    ok "Wallpapers WhiteSur substituídos por Tchesco (sem cores Apple)"
 }
 
 setup_firefox_global_menu() {
@@ -751,6 +798,7 @@ main() {
     configure_sddm
     setup_plymouth
     fix_apple_icons
+    replace_whitesur_apple_wallpapers
     setup_global_menu
     replace_firefox_snap
     setup_firefox_global_menu
