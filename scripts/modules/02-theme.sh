@@ -647,11 +647,17 @@ wheel:Vertical;NoModifier=org.kde.switchdesktop
 [Containments][1]
 activityId=
 formfactor=0
-immutability=1
+immutability=2
 lastScreen=0
 location=0
 plugin=org.kde.plasma.folder
 wallpaperplugin=org.kde.image
+
+[Containments][1][General]
+ToolBoxButtonState=topleft
+
+[Containments][1][ToolBox]
+visibility=none
 
 [Containments][1][Wallpaper][org.kde.image][General]
 Image=file:///usr/share/wallpapers/Next/contents/images/5120x2880.png
