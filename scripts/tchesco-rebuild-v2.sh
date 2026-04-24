@@ -5,7 +5,7 @@ set -euo pipefail
 
 KUBUNTU_ISO="/media/sf_D_DRIVE/Downloads/kubuntu-26.04-desktop-amd64.iso"
 BOOT_ISO="/media/sf_D_DRIVE/tchesco-os-1.0-FINAL.iso"
-OUTPUT_ISO="/media/sf_D_DRIVE/tchesco-os-1.0-amd64.iso"
+OUTPUT_ISO="/media/sf_D_DRIVE/tchesco-os-1.1-amd64.iso"
 WORK_IMG="/media/sf_D_DRIVE/tchesco-work.img"
 WORK_MNT="/mnt/tchesco-work"
 MBR_IMG="/var/tmp/kubuntu-mbr.img"
@@ -255,7 +255,7 @@ sed -i 's/Try or Install Kubuntu/Try or Install Tchesco OS/g' "$ISO_DIR/boot/gru
 sed -i 's/Kubuntu (safe graphics)/Tchesco OS (safe graphics)/g' "$ISO_DIR/boot/grub/loopback.cfg" 2>/dev/null || true
 
 # disk/info
-echo "Tchesco OS 1.0 \"Resolute Raccoon\" - Release amd64 ($(date +%Y%m%d))" \
+echo "Tchesco OS 1.1 \"Resolute Raccoon\" - Release amd64 ($(date +%Y%m%d))" \
     > "$ISO_DIR/.disk/info"
 
 # ─── 8. Recomprime squashfs ───────────────────────────────────────────────────
@@ -293,7 +293,7 @@ xorriso -as mkisofs \
     -e '--interval:appended_partition_2_start_0s_size_10296d:all::' \
     -no-emul-boot \
     -boot-load-size 10296 \
-    -V TCHESCO_OS_1_0 \
+    -V TCHESCO_OS_1_1 \
     -o "$OUTPUT_ISO" \
     -graft-points \
     "$ISO_DIR" \
