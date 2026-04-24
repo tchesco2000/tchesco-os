@@ -275,6 +275,10 @@ apply_kde_config() {
     as_user kwriteconfig6 --file kdeglobals \
         --group KDE --key LookAndFeelPackage "com.github.vinceliuice.WhiteSur"
 
+    # Desativa ksplash do WhiteSur — mostra logo Apple durante login
+    as_user kwriteconfig6 --file ksplashrc \
+        --group KSplash --key Theme "None"
+
     # Tema GTK (para apps GTK dentro do KDE)
     mkdir -p "$REAL_HOME/.config/gtk-3.0" "$REAL_HOME/.config/gtk-4.0"
     chown "$REAL_USER:$REAL_USER" "$REAL_HOME/.config/gtk-3.0" "$REAL_HOME/.config/gtk-4.0"
