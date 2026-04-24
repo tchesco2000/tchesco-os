@@ -404,57 +404,78 @@ configure_top_panel() {
     # Escreve script com heredoc literal (sem expansão) + sed injeta os paths
     cat > "$script_path" << 'PANEL_EOF'
 #!/bin/bash
-# Configura painéis macOS estilo Tchesco OS — executa uma vez no login
+# Configura painéis macOS estilo Tchesco OS — executa uma vez após instalação.
+# Se precisar reaplicar, delete ~/.tchesco-panel-done e faça logout/login.
 FLAG="__FLAG_PATH__"
 [[ -f "$FLAG" ]] && exit 0
 
-# Ubuntu 26.04 usa qdbus6 (não qdbus)
 QDBUS="qdbus6"
 
-# Aguarda Plasma carregar (máximo 90s) e obtém DBUS da sessão gráfica
-# O systemd não herda DBUS_SESSION_BUS_ADDRESS — precisa descobrir manualmente
+# ── FASE 1: Aguarda Plasma subir (após login inicial) ──────────────
+# O systemd não herda DBUS_SESSION_BUS_ADDRESS — obtemos do /proc
 for i in $(seq 1 45); do
     sleep 2
-    # Descobre DBUS_SESSION_BUS_ADDRESS da sessão plasmashell
     PLASMA_PID=$(pgrep -u "$USER" plasmashell 2>/dev/null | head -1)
-    if [[ -n "$PLASMA_PID" ]]; then
-        DBUS_ADDR=$(cat /proc/"$PLASMA_PID"/environ 2>/dev/null \
-            | tr '\0' '\n' \
-            | grep DBUS_SESSION_BUS_ADDRESS \
-            | cut -d= -f2-)
-        if [[ -n "$DBUS_ADDR" ]]; then
-            export DBUS_SESSION_BUS_ADDRESS="$DBUS_ADDR"
-            # Testa se o evaluateScript responde de verdade
-            TEST=$($QDBUS org.kde.plasmashell /PlasmaShell evaluateScript "panels().length" 2>/dev/null)
-            [[ -n "$TEST" ]] && break
-        fi
-    fi
+    [[ -z "$PLASMA_PID" ]] && continue
+    DBUS_ADDR=$(cat /proc/"$PLASMA_PID"/environ 2>/dev/null \
+        | tr '\0' '\n' | grep DBUS_SESSION_BUS_ADDRESS | cut -d= -f2-)
+    [[ -z "$DBUS_ADDR" ]] && continue
+    export DBUS_SESSION_BUS_ADDRESS="$DBUS_ADDR"
+    break
 done
 
-# Desabilita override de tema automático do Kubuntu
+# ── FASE 2: Reset completo de painéis ──────────────────────────────
+# Previne acumulação de painéis órfãos em re-execuções:
+#   panel.remove() via JS remove do appletsrc, mas deixa [PlasmaViews][Panel N]
+#   lixo no plasmashellrc, causando barras vazias sobrepostas.
+# Solução: matar plasmashell → limpar configs → subir plasmashell do zero.
+kquitapp6 plasmashell 2>/dev/null || true
+sleep 2
+pkill -9 plasmashell 2>/dev/null || true
+sleep 1
+
+rm -f "$HOME/.config/plasmashellrc"
+rm -f "$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
+
+# Desabilita override do Kubuntu ANTES de subir plasmashell
 kwriteconfig6 --file kdeglobals --group KDE --key AutomaticLookAndFeel false
 
-# Cria painéis via Plasma JS API
+# Sobe plasmashell de novo (config zerada → só o painel padrão Kubuntu)
+nohup plasmashell >/dev/null 2>&1 &
+disown
+
+# Aguarda plasmashell responder ao DBUS com config nova
+for i in $(seq 1 30); do
+    sleep 2
+    PLASMA_PID=$(pgrep -u "$USER" plasmashell 2>/dev/null | head -1)
+    [[ -z "$PLASMA_PID" ]] && continue
+    DBUS_ADDR=$(cat /proc/"$PLASMA_PID"/environ 2>/dev/null \
+        | tr '\0' '\n' | grep DBUS_SESSION_BUS_ADDRESS | cut -d= -f2-)
+    [[ -z "$DBUS_ADDR" ]] && continue
+    export DBUS_SESSION_BUS_ADDRESS="$DBUS_ADDR"
+    TEST=$($QDBUS org.kde.plasmashell /PlasmaShell evaluateScript "panels().length" 2>/dev/null)
+    [[ -n "$TEST" ]] && break
+done
+sleep 3  # margem para o painel padrão Kubuntu aparecer antes de substituir
+
+# ── FASE 3: Cria painéis Tchesco ───────────────────────────────────
 $QDBUS org.kde.plasmashell /PlasmaShell evaluateScript "
-// Remove todos os painéis existentes (painel padrão Kubuntu)
+// Remove painel padrão do Kubuntu
 panels().forEach(function(p) { p.remove() })
 
-// ── BARRA SUPERIOR estilo macOS ──────────────────────────────────
+// Barra superior estilo macOS
 var top = new Panel
 top.location = 'top'
 top.height = 40
 top.hiding = 'none'
 
-// Path completo garante que o ícone é encontrado independente do cache
 var launcher = top.addWidget('org.kde.plasma.kickoff')
 launcher.currentConfigGroup = ['General']
 launcher.writeConfig('icon', '__ICON_PATH__')
 
-// Global Menu: menus da app ativa aparecem na barra, igual ao macOS
 top.addWidget('org.kde.plasma.appmenu')
 top.addWidget('org.kde.plasma.panelspacer')
 
-// Lupa estilo Spotlight do macOS (Application Dashboard com busca)
 var search = top.addWidget('org.kde.plasma.kickerdash')
 search.currentConfigGroup = ['General']
 search.writeConfig('icon', 'search')
@@ -462,8 +483,7 @@ search.writeConfig('icon', 'search')
 top.addWidget('org.kde.plasma.systemtray')
 top.addWidget('org.kde.plasma.digitalclock')
 
-// ── DOCK CENTRALIZADO estilo macOS ───────────────────────────────
-// KDE Plasma 6 nativo: funciona em Wayland, suporta flutuante e centralizado
+// Dock centralizado flutuante estilo macOS
 var dock = new Panel
 dock.location = 'bottom'
 dock.height = 72
@@ -472,7 +492,6 @@ dock.alignment = 'center'
 dock.lengthMode = 'fit'
 dock.floating = true
 
-// Icon-only Task Manager (igual ao Dock do macOS)
 var tasks = dock.addWidget('org.kde.plasma.icontasks')
 tasks.currentConfigGroup = ['General']
 tasks.writeConfig('launchers', 'applications:org.kde.dolphin.desktop,applications:org.kde.konsole.desktop,applications:systemsettings.desktop,applications:org.kde.kate.desktop')
