@@ -815,28 +815,59 @@ X-KDE-autostart-after=panel
 EOF
     chown "$REAL_USER:$REAL_USER" "$autostart_dir/plank.desktop"
 
-    # Script background que esconde o Plasma Toolbox (botão 48x48 "Add Widgets")
-    # O ToolBox é criado pelo plasmashell e não responde a nenhuma config.
-    # Solução: setar opacity=0 via xprop — compositor KWin torna invisível.
-    local hide_script="$REAL_HOME/.local/bin/tchesco-hide-toolbox.sh"
+    # Esconde o Plasma Toolbox (botão 48x48 "Add Widgets") que não responde
+    # a nenhuma config e ignora opacity=0 (window type DOCK + KDE_OVERRIDE).
+    # Solução: compilar helper C que usa XUnmapWindow diretamente + daemon.
+
+    # Dependências: x11-utils (xwininfo), libx11-dev + gcc (compilação)
+    local deps=(x11-utils gcc libx11-dev)
+    local to_install=()
+    for p in "${deps[@]}"; do
+        dpkg -s "$p" &>/dev/null 2>&1 || to_install+=("$p")
+    done
+    [[ ${#to_install[@]} -gt 0 ]] && \
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${to_install[@]}" >> "$LOG_FILE" 2>&1
+
     as_user mkdir -p "$REAL_HOME/.local/bin"
 
+    # Compila helper C (XUnmapWindow via Xlib — única coisa que funciona em DOCK windows)
+    local unmap_src="/tmp/tchesco-unmap.c"
+    cat > "$unmap_src" << 'EOF'
+#include <X11/Xlib.h>
+#include <stdlib.h>
+int main(int argc, char **argv) {
+    if (argc < 2) return 1;
+    Display *d = XOpenDisplay(NULL);
+    if (!d) return 1;
+    Window w = strtoul(argv[1], NULL, 16);
+    XUnmapWindow(d, w);
+    XFlush(d);
+    XCloseDisplay(d);
+    return 0;
+}
+EOF
+    gcc "$unmap_src" -o "$REAL_HOME/.local/bin/tchesco-unmap" -lX11 2>> "$LOG_FILE"
+    chown "$REAL_USER:$REAL_USER" "$REAL_HOME/.local/bin/tchesco-unmap"
+    chmod +x "$REAL_HOME/.local/bin/tchesco-unmap"
+
+    # Daemon que detecta e esconde o toolbox sempre que aparecer
+    local hide_script="$REAL_HOME/.local/bin/tchesco-hide-toolbox.sh"
     cat > "$hide_script" << 'EOF'
 #!/bin/bash
-# Esconde o botão "Add Widgets" 48x48 do Plasma Toolbox — seta opacity=0.
-# Loop contínuo porque a janela pode ser recriada pelo plasmashell.
+# Daemon que esconde o Plasma Toolbox (48x48 DOCK) via XUnmapWindow.
 export DISPLAY=:0
 sleep 8
 
+UNMAP="$HOME/.local/bin/tchesco-unmap"
 while true; do
     xwininfo -root -tree 2>/dev/null | awk '/48x48\+[0-9]+\+1[0-9]+/ {print $1}' | \
     while IFS= read -r wid; do
-        cur=$(xprop -id "$wid" _NET_WM_WINDOW_OPACITY 2>/dev/null | grep -oE "= [0-9]+" | awk '{print $2}')
-        if [[ "$cur" != "0" ]]; then
-            xprop -id "$wid" -f _NET_WM_WINDOW_OPACITY 32c -set _NET_WM_WINDOW_OPACITY 0 2>/dev/null
+        state=$(xwininfo -id "$wid" 2>/dev/null | grep "Map State" | awk '{print $NF}')
+        if [[ "$state" == "IsViewable" ]]; then
+            "$UNMAP" "$wid" 2>/dev/null
         fi
     done
-    sleep 3
+    sleep 2
 done
 EOF
     chmod +x "$hide_script"
@@ -854,11 +885,7 @@ X-KDE-autostart-after=panel
 EOF
     chown "$REAL_USER:$REAL_USER" "$autostart_dir/tchesco-hide-toolbox.desktop"
 
-    # Garante que xprop/xwininfo estão instalados
-    dpkg -s x11-utils &>/dev/null 2>&1 || \
-        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq x11-utils >> "$LOG_FILE" 2>&1
-
-    ok "Plank configurado: 8 apps + autohide + zoom + hide-toolbox ativo"
+    ok "Plank configurado: 8 apps + autohide + zoom + hide-toolbox (XUnmap)"
 }
 
 configure_sddm() {
