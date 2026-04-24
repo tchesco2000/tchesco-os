@@ -166,7 +166,7 @@ install_base_packages() {
         # Monitoramento e diagnóstico
         htop
         btop
-        neofetch
+        fastfetch
         tree
         ncdu
         lsof
