@@ -381,10 +381,10 @@ panels().forEach(function(p) { p.remove() })
 // ── BARRA SUPERIOR estilo macOS ──────────────────────────────────
 var top = new Panel
 top.location = 'top'
-top.height = 44
+top.height = 64
 top.hiding = 'none'
 
-// Ícone T quadrado — escala bem com o painel de 44px, fica grande e visível
+// Ícone T quadrado — painel 64px dá ~44px de ícone, bem visível
 var launcher = top.addWidget('org.kde.plasma.kickoff')
 launcher.currentConfigGroup = ['General']
 launcher.writeConfig('icon', 'tchesco')
@@ -520,24 +520,21 @@ configure_sddm() {
     step "Configurando tela de login SDDM (Tchesco OS)"
 
     local logo_src="$REPO_DIR/tchesco-logo-pack/tchesco-os/assets/logo/tchesco-logo-horizontal.svg"
-    local sddm_theme_dir="/usr/share/sddm/themes/kubuntu"
 
     if [[ ! -f "$logo_src" ]]; then
         warn "Logo não encontrado para SDDM — pulando"
         return 0
     fi
 
-    # Copia logo Tchesco para o tema SDDM
-    cp "$logo_src" "$sddm_theme_dir/tchesco-logo.svg"
-
-    # Sobrescreve o default-logo.svg do Kubuntu com o logo Tchesco
+    # Usa tema breeze (KDE nativo, sem estética Apple)
+    # e injeta logo + cor Tchesco
+    local sddm_theme_dir="/usr/share/sddm/themes/breeze"
     cp "$logo_src" "$sddm_theme_dir/default-logo.svg"
 
-    # Reconfigura o tema: cor escura Tchesco, sem fundo Kubuntu, logo visível
     cat > "$sddm_theme_dir/theme.conf" << 'EOF'
 [General]
 showlogo=visible
-logo=/usr/share/sddm/themes/kubuntu/default-logo.svg
+logo=/usr/share/sddm/themes/breeze/default-logo.svg
 type=color
 color=#0e1117
 fontSize=11
@@ -546,7 +543,14 @@ needsFullUserModel=false
 showClock=true
 EOF
 
-    ok "Tela de login configurada com identidade Tchesco"
+    # Ativa o tema breeze no SDDM
+    if grep -q "Current=" /etc/sddm.conf.d/*.conf 2>/dev/null; then
+        sed -i "s/^Current=.*/Current=breeze/" /etc/sddm.conf.d/*.conf
+    else
+        printf "[Theme]\nCurrent=breeze\n" >> /etc/sddm.conf
+    fi
+
+    ok "Tela de login: breeze + logo Tchesco + fundo escuro"
 }
 
 fix_apple_icons() {
