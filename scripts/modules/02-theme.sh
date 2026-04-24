@@ -705,6 +705,10 @@ EOF
     # Desabilita override automático de tema do Kubuntu
     as_user kwriteconfig6 --file kdeglobals --group KDE --key AutomaticLookAndFeel false
 
+    # Trava widgets do desktop — some o botão "Add Widgets" que aparecia na borda inferior
+    as_user kwriteconfig6 --file plasma-org.kde.plasma.desktop-appletsrc \
+        --group Containments --group 1 --key immutability 1
+
     ok "Painel superior configurado (44px) — dock Plank via configure_plank_dock()"
 }
 
@@ -719,6 +723,9 @@ configure_plank_dock() {
 
     # Configuração do dock: centralizado (Alignment=3 = Center), autohide com hover,
     # zoom 150%, posição bottom, tema transparente, ícones 48px
+    # HideMode=2 = AutoHide real (some sempre, hover-to-show funciona garantido)
+    # Alignment=3 = Center, Position=3 = Bottom
+    # Zoom 150% = ícones crescem ao passar mouse (igual macOS)
     cat > "$plank_dir/settings" << 'EOF'
 [PlankDockPreferences]
 CurrentWorkspaceOnly=false
@@ -729,7 +736,7 @@ Theme=Transparent
 Position=3
 ShowDockItem=false
 HideDelay=0
-HideMode=1
+HideMode=2
 UnhideDelay=0
 Alignment=3
 Offset=0
@@ -737,8 +744,8 @@ ZoomEnabled=true
 ZoomPercent=150
 PressureReveal=false
 PinnedOnly=false
-AutoPinning=true
-ShowOnClick=true
+AutoPinning=false
+ShowOnClick=false
 TooltipsEnabled=true
 EOF
 
