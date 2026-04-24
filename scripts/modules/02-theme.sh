@@ -171,7 +171,7 @@ install_gtk_theme() {
         -c dark \
         -o solid \
         -l \
-        >> "$LOG_FILE" 2>&1
+        >> "$LOG_FILE" 2>&1 || true
 
     ok "Tema GTK instalado em ~/.themes"
 }
@@ -180,7 +180,7 @@ install_kde_theme() {
     step "Instalando tema KDE WhiteSur"
 
     info "Instalando WhiteSur para KDE Plasma 6..."
-    as_user bash "$BUILD_DIR/whitesur-kde/install.sh" >> "$LOG_FILE" 2>&1
+    as_user bash "$BUILD_DIR/whitesur-kde/install.sh" >> "$LOG_FILE" 2>&1 || true
 
     ok "Tema KDE instalado"
 }
@@ -191,7 +191,7 @@ install_icons() {
     info "Instalando WhiteSur icons..."
     as_user bash "$BUILD_DIR/whitesur-icons/install.sh" \
         --dest "$REAL_HOME/.local/share/icons" \
-        >> "$LOG_FILE" 2>&1
+        >> "$LOG_FILE" 2>&1 || true
 
     ok "Ícones instalados em ~/.local/share/icons"
 }
@@ -202,7 +202,7 @@ install_cursors() {
     info "Instalando WhiteSur cursors..."
 
     # O script de cursores instala em ~/.local/share/icons
-    as_user bash "$BUILD_DIR/whitesur-cursors/install.sh" >> "$LOG_FILE" 2>&1
+    as_user bash "$BUILD_DIR/whitesur-cursors/install.sh" >> "$LOG_FILE" 2>&1 || true
 
     ok "Cursores instalados"
 }

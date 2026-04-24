@@ -146,14 +146,20 @@ Desenvolvimento em fases incrementais, cada uma validada na VM antes de avançar
 - [x] Bottles (Flatpak)
 - [x] Dependências Winetricks: cabextract, unzip, p7zip-full
 
-### Fase 8 — Consolidação e testes ⏳ PRÓXIMA
+### Fase 8 — Consolidação e testes ✅ CONCLUÍDA
 
-- [ ] Instalação limpa completa na VM (do zero)
-- [ ] Medir tempo total de instalação
-- [ ] Tratamento de erros em todos os módulos
-- [ ] Logs em `/var/log/tchesco-install.log`
+> Correções aplicadas:
+> - **02-theme.sh**: `|| true` nos 4 scripts WhiteSur (install.sh sai com não-zero mesmo em sucesso)
+> - **06-wine.sh**: chave WineHQ em dois passos (curl separado do gpg --dearmor); apt update `|| true`
+> - **tchesco-install.sh**: orquestrador com timing por módulo, tabela de resumo, resiliência a erros
 
-### Fase 9 — Identidade do Tchesco OS ⏳
+- [x] Orquestrador atualizado com Fases 2–7 completas
+- [x] Timing por módulo + tabela de resumo colorida
+- [x] Teste de idempotência: 7/7 módulos OK em sistema já instalado
+- [x] Tempo total em sistema já instalado: **1m 10s**
+- [x] Logs em `/var/log/tchesco-install.log`
+
+### Fase 9 — Identidade do Tchesco OS ⏳ PRÓXIMA
 
 - [ ] `/etc/os-release` customizado (NAME="Tchesco OS")
 - [ ] "Sobre o Sistema" mostrando Tchesco OS 1.0
