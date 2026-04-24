@@ -282,7 +282,41 @@ apply_kde_config() {
         [[ -f "$splash_logo" && -f "$kde_icon" ]] && cp "$kde_icon" "$splash_logo"
     done
 
-    # Mantém o ksplash WhiteSur ativo (agora com logo Tchesco, não Apple)
+    # Gera background escuro Tchesco (substitui wallpaper macOS Monterey)
+    python3 - << 'PYEOF'
+from PIL import Image
+import os, shutil
+
+w, h = 1920, 1080
+img = Image.new("RGBA", (w, h))
+pixels = img.load()
+
+for y in range(h):
+    for x in range(w):
+        rx, ry = x / w, y / h
+        r = min(30, int(10 + rx * 3 + ry * 5))
+        g = min(52, int(17 + rx * 15 + ry * 20))
+        b = min(98, int(40 + rx * 30 + ry * 28))
+        pixels[x, y] = (r, g, b, 255)
+
+cx, cy = w // 2, h // 2
+max_dist = (cx**2 + cy**2) ** 0.5
+for y in range(h):
+    for x in range(w):
+        dist = ((x-cx)**2 + (y-cy)**2) ** 0.5
+        factor = max(0, 1 - dist / (max_dist * 0.6))
+        r, g, b, a = pixels[x, y]
+        pixels[x, y] = (min(255, r + int(factor*8)), min(255, g + int(factor*10)), min(255, b + int(factor*40)), a)
+
+bg = "/tmp/tchesco-splash-bg.png"
+img.save(bg)
+base = os.path.expanduser("~/.local/share/plasma/look-and-feel")
+for v in ["WhiteSur", "WhiteSur-alt", "WhiteSur-dark"]:
+    dest = os.path.join(base, f"com.github.vinceliuice.{v}/contents/splash/images/background.png")
+    os.path.exists(os.path.dirname(dest)) and shutil.copy(bg, dest)
+PYEOF
+
+    # Mantém o ksplash WhiteSur ativo (agora com logo Tchesco e fundo Tchesco)
     as_user kwriteconfig6 --file ksplashrc \
         --group KSplash --key Theme "com.github.vinceliuice.WhiteSur"
 
