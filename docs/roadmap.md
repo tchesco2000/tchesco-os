@@ -131,16 +131,22 @@ Desenvolvimento em fases incrementais, cada uma validada na VM antes de avançar
 - [x] CUPS + cups-browsed + SANE + Simple Scan + printer-driver-all
 - [x] Timeshift (backup)
 
-### Fase 7 — Script v0.6: Compatibilidade Windows ⏳ PRÓXIMA
+### Fase 7 — Script v0.6: Compatibilidade Windows ✅ CONCLUÍDA
 
 `scripts/modules/06-wine.sh`
 
-- [ ] Wine Staging (repo WineHQ)
-- [ ] Winetricks
-- [ ] Bottles (Flatpak)
-- [ ] Testar rodar .exe simples
+> Decisões tomadas durante execução:
+> - **WineHQ resolute funciona** — repo suporta Ubuntu 26.04 (ao contrário do Lutris PPA)
+> - **curl key separado do gpg** — pipe `curl | gpg --dearmor` quebrava; fix: download em dois passos
+> - **apt update com `|| true`** — resiliente a PPAs com erro (ex: Lutris PPA órfão)
+> - **Winetricks do GitHub** — versão latest (repos Ubuntu ficam desatualizados)
 
-### Fase 8 — Consolidação e testes ⏳
+- [x] Wine Staging 11.7 (WineHQ resolute)
+- [x] Winetricks 20260125-next (latest do GitHub)
+- [x] Bottles (Flatpak)
+- [x] Dependências Winetricks: cabextract, unzip, p7zip-full
+
+### Fase 8 — Consolidação e testes ⏳ PRÓXIMA
 
 - [ ] Instalação limpa completa na VM (do zero)
 - [ ] Medir tempo total de instalação
