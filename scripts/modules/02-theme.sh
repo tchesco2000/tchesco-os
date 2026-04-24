@@ -393,13 +393,13 @@ panels().forEach(function(p) { p.remove() })
 // ── BARRA SUPERIOR estilo macOS ──────────────────────────────────
 var top = new Panel
 top.location = 'top'
-top.height = 64
+top.height = 40
 top.hiding = 'none'
 
-// Ícone T quadrado — painel 64px dá ~44px de ícone, bem visível
+// Path completo garante que o ícone é encontrado independente do cache
 var launcher = top.addWidget('org.kde.plasma.kickoff')
 launcher.currentConfigGroup = ['General']
-launcher.writeConfig('icon', 'tchesco')
+launcher.writeConfig('icon', '__ICON_PATH__')
 
 // Global Menu: menus da app ativa aparecem na barra, igual ao macOS
 top.addWidget('org.kde.plasma.appmenu')
@@ -545,7 +545,7 @@ configure_sddm() {
 
     cat > "$sddm_theme_dir/theme.conf" << 'EOF'
 [General]
-showlogo=visible
+showlogo=shown
 logo=/usr/share/sddm/themes/breeze/default-logo.svg
 type=color
 color=#0e1117
