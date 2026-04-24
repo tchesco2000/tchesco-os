@@ -91,24 +91,28 @@ Desenvolvimento em fases incrementais, cada uma validada na VM antes de avançar
 
 ---
 
-### Fase 5 — Script v0.4: Pilar Jogos ⏳ PRÓXIMA
+### Fase 5 — Script v0.4: Pilar Jogos ✅ CONCLUÍDA
 
 `scripts/modules/04-gaming.sh`
 
-- [ ] `dpkg --add-architecture i386` (32-bit)
-- [ ] Drivers GPU: `ubuntu-drivers autoinstall`
-- [ ] Vulkan: `vulkan-tools`, `libvulkan1`, `libvulkan1:i386`
-- [ ] Steam (repo oficial Valve)
-- [ ] Lutris (PPA)
-- [ ] Heroic Games Launcher (Flatpak)
-- [ ] GameMode (`gamemode`, `gamemoded`)
-- [ ] MangoHud (`mangohud`, `mangohud:i386`)
-- [ ] GOverlay (configurador MangoHud/GameMode)
-- [ ] ProtonUp-Qt (Flatpak — gerencia versões Proton-GE)
-- [ ] CoreCtrl (controle de GPU AMD)
-- [ ] Testar: Steam abre + jogo simples instala
+> Decisões tomadas durante execução:
+> - **Lutris via Flatpak** — PPA não suporta Ubuntu 26.04 "resolute" ainda
+> - **MangoHud sem i386** — pacote `mangohud:i386` não disponível no Ubuntu 26.04
 
-### Fase 6 — Script v0.5: Pilar Office ⏳
+- [x] `dpkg --add-architecture i386` (32-bit)
+- [x] Drivers GPU: Mesa genérico + `ubuntu-drivers autoinstall` (não-fatal em VM)
+- [x] Vulkan: `vulkan-tools`, `libvulkan1`, `libvulkan1:i386`
+- [x] Steam (multiverse Ubuntu)
+- [x] Lutris (Flatpak — PPA sem suporte a resolute)
+- [x] Heroic Games Launcher (Flatpak)
+- [x] GameMode (`gamemode`)
+- [x] MangoHud 64-bit (`mangohud`)
+- [x] GOverlay (Flatpak — configurador MangoHud)
+- [x] ProtonUp-Qt (Flatpak — gerencia versões Proton-GE)
+- [x] CoreCtrl + polkit rule (controle de GPU sem senha root)
+- [x] `gamemode.ini` com perfil `performance`
+
+### Fase 6 — Script v0.5: Pilar Office ⏳ PRÓXIMA
 
 `scripts/modules/05-office.sh`
 
