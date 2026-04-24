@@ -8,6 +8,8 @@ Tchesco OS é uma distribuição Linux baseada em **Kubuntu 26.04 LTS** com visu
 - **Código local:** `/mnt/d/www/ia_documentacao/tchesco_OS`
 - **VM de teste:** `192.168.0.24` — user: `suporte`, pass: `tchesco` (SSH liberado)
 - **Base:** Ubuntu 26.04 LTS (Resolute Raccoon) + KDE Plasma 6.6.4 + **X11 obrigatório**
+- **ISO atual:** `D:\tchesco-os-1.0-amd64.iso` (6.6GB) — gerada com `tchesco-rebuild-v2.sh`
+- **Versão:** 1.0
 
 ---
 
@@ -26,22 +28,32 @@ Tchesco OS é uma distribuição Linux baseada em **Kubuntu 26.04 LTS** com visu
 ```
 tchesco_OS/
 ├── scripts/
-│   ├── tchesco-install.sh       # Orquestrador principal (roda como sudo)
+│   ├── tchesco-install.sh          # Orquestrador principal (roda como sudo)
+│   ├── build-iso.sh                # Build ISO via chroot (base)
+│   ├── rebuild-iso-boot.sh         # Rebuild com fixes de boot/Plymouth/welcome
+│   ├── tchesco-rebuild-v2.sh       # Rebuild definitivo v2 (usar este)
 │   └── modules/
-│       ├── 01-base.sh           # ✅ Fase 2 — Base Ubuntu, locale, timezone
-│       ├── 02-theme.sh          # ✅ Fase 3 — Visual macOS completo
-│       ├── 02b-i18n.sh          # ✅ Fase 3.5 — 11 idiomas + fcitx5
-│       ├── 03-dev.sh            # ✅ Fase 4 — VS Code, Docker, Node, Rust, Go
-│       ├── 04-gaming.sh         # ⏳ Fase 5 — Steam, Lutris, GameMode
-│       ├── 05-office.sh         # ⏳ Fase 6 — LibreOffice, VLC, OBS
-│       ├── 06-wine.sh           # ⏳ Fase 7 — Wine, Bottles
-│       └── ...
+│       ├── 01-base.sh              # ✅ Fase 2 — Base Ubuntu, locale, timezone
+│       ├── 02-theme.sh             # ✅ Fase 3 — Visual macOS completo
+│       ├── 02b-i18n.sh             # ✅ Fase 3.5 — 11 idiomas + fcitx5
+│       ├── 03-dev.sh               # ✅ Fase 4 — VS Code, Docker, Node, Rust, Go
+│       ├── 04-gaming.sh            # ✅ Fase 5 — Steam, Lutris, GameMode
+│       ├── 05-office.sh            # ✅ Fase 6 — LibreOffice, VLC, OBS
+│       ├── 06-wine.sh              # ✅ Fase 7 — Wine Staging, Bottles
+│       └── 07-identity.sh          # ✅ Fase 9 — os-release, GRUB, fastfetch
+├── setup/
+│   ├── calamares/branding/tchesco/ # Branding do instalador Calamares
+│   └── welcome/                    # App de boas-vindas Tchesco (PyQt6)
+│       ├── tchesco-welcome         # Script Python do welcome
+│       ├── tchesco-welcome.desktop
+│       ├── tchesco-welcome-autostart.desktop
+│       └── install-welcome.sh
 ├── docs/
-│   ├── roadmap.md               # Status de todas as fases
-│   ├── architecture.md          # Decisões técnicas fundamentais
-│   ├── packages.md              # Lista de pacotes por fase
+│   ├── roadmap.md                  # Status de todas as fases
+│   ├── architecture.md             # Decisões técnicas fundamentais
+│   ├── packages.md                 # Lista de pacotes por fase
 │   └── ...
-├── tchesco-logo-pack/           # SVGs e assets visuais
+├── tchesco-logo-pack/              # SVGs e assets visuais
 └── tests/
     └── vm-test-checklist.md
 ```
@@ -116,13 +128,36 @@ check_root() { [[ $EUID -eq 0 ]] || die "Execute como root: sudo $0"; }
 - **Fix:** `/etc/profile.d/tchesco-gtk-modules.sh` + `~/.config/plasma-workspace/env/gtk-modules.sh`
 
 ### Bug 6 — "Add Widgets" fantasma sobre o Plank
-- **Causa:** Plasma 6 rejeita Containment desktop com `activityId=` vazio ou plugin errado, cria outro auto (id 52/49/55) que renderiza o ToolBoxButton sobre o Plank.
-- **Fix:** No `configure_top_panel()`: detectar Activity ID via DBus ANTES de matar plasmashell, injetar no `[Containments][1]`, usar `plugin=org.kde.plasma.folder` + `immutability=1`. Matar plasmashell antes de escrever arquivos. Função `cleanup_residual_panels()` remove qualquer Containment/Panel fora do allowlist `{1, 29}`.
-- **NÃO usar:** `XUnmapWindow` C helper, daemon xwininfo, `plugin=org.kde.desktopcontainment`, `immutability=2`.
+- **Causa:** Plasma 6 rejeita Containment desktop com `activityId=` vazio ou plugin errado.
+- **Fix:** Detectar Activity ID via DBus ANTES de matar plasmashell, usar `plugin=org.kde.plasma.folder` + `immutability=1`. Função `cleanup_residual_panels()` remove Containments fora do allowlist `{1, 29}`.
+- **NÃO usar:** `XUnmapWindow` C helper, `plugin=org.kde.desktopcontainment`, `immutability=2`.
 
 ### Bug 7 — Plank não inicia via SSH
 - **Causa:** Precisa de `XDG_SESSION_TYPE=x11` e `DESKTOP_SESSION=plasmax11` no env
 - **Fix:** `env -i DISPLAY=:0 XDG_SESSION_TYPE=x11 XDG_RUNTIME_DIR=/run/user/1000 XDG_CURRENT_DESKTOP=KDE DESKTOP_SESSION=plasmax11 HOME=/home/suporte USER=suporte PATH=/usr/bin:/bin plank`
+
+### Bug 8 — WhiteSur installs Plymouth with Apple logo
+- **Causa:** `02-theme.sh` instala WhiteSur que inclui Plymouth theme com logo Apple.
+- **Fix:** No rebuild da ISO, usar `unmkinitramfs` para extrair o initrd, remover arquivos `whitesur*` dentro dele, forçar `Theme=breeze-text` em `etc/plymouth/plymouthd.conf`, reempacotar com cpio+gzip.
+- **NÃO usar:** `update-initramfs` no chroot sem bind mounts (não funciona, não regenera o initrd da ISO).
+
+### Bug 9 — plasma-welcome intercepta boot do live
+- **Causa:** `plasma-welcome` (pacote KDE) abre automaticamente no primeiro boot, mostrando "Kubuntu".
+- **Fix:** `apt-get remove --purge plasma-welcome kubuntu-welcome` no chroot + remover `/etc/xdg/autostart/plasma-welcome.desktop`.
+
+### Bug 10 — ISO live sem tema (desktop Kubuntu padrão)
+- **Causa:** KDE configs visuais ficam em `/home/suporte/.config/` na VM de referência mas não são copiadas para o live user `/home/ubuntu/` no squashfs.
+- **Fix:** `tchesco-rebuild-v2.sh` copia todos os items KDE críticos do suporte para `/home/ubuntu/` e `/etc/skel/` antes de reempacotar o squashfs.
+
+### Bug 11 — xorriso `curl | gpg --dearmor` quebra pipe
+- **Fix:** Fazer download em dois passos separados: `curl -o /tmp/key.gpg` e depois `gpg --dearmor < /tmp/key.gpg > /usr/share/keyrings/...`
+
+### Bug 12 — squashfs >4GB falha no xorriso padrão
+- **Fix:** Sempre usar `-iso-level 3 -r -J` no xorriso para suporte a arquivos maiores que 4GB.
+
+### Bug 13 — mksquashfs esgota espaço em /tmp (tmpfs)
+- **Causa:** `/tmp` é tmpfs limitado a metade da RAM (~3.9GB).
+- **Fix:** Usar `/var/tmp` (ext4) ou criar loop image no D: para workspace de build.
 
 ---
 
@@ -135,26 +170,71 @@ check_root() { [[ $EUID -eq 0 ]] || die "Execute como root: sudo $0"; }
 | Dock | Plank (não Plasma panel): HideMode=1 Intelligent, PressureReveal=true, IconSize=48, Alignment=3 Center, ZoomPercent=150 |
 | 8 apps dock | Firefox, Dolphin, Kate, Konsole, VSCode, Spectacle, Settings, Widgets |
 | Ícone menu (T) | `tchesco-icon-kde.svg` via `useCustomButtonImage=true` |
-| Wallpaper | WhiteSur-dark (substituído por gradient Tchesco escuro via PIL) |
+| Wallpaper | WhiteSur-dark |
 | SDDM | tema breeze + logo horizontal + fundo `#0e1117` |
-| Plymouth | breeze-text (sem referência Apple) |
+| Plymouth | breeze-text (sem referência Apple) — corrigido no initrd |
 | Firefox | deb Mozilla (não snap), menus internos via policies.json |
 | Session | plasmax11 (X11 obrigatório) |
+| os-release | NAME="Tchesco OS", PRETTY_NAME="Tchesco OS 1.0" |
+| fastfetch | logo T azul/ciano, config em `~/.config/fastfetch/config.jsonc` |
+
+---
+
+## Como Gerar a ISO
+
+```bash
+# Rebuild completo (v2) — usar sempre este:
+sshpass -p tchesco scp -r scripts/ setup/ suporte@192.168.0.24:~/tchesco-os/
+sshpass -p tchesco ssh suporte@192.168.0.24 \
+  "echo tchesco | sudo -S bash ~/tchesco-os/scripts/tchesco-rebuild-v2.sh 2>&1"
+
+# ISO de saída: D:\tchesco-os-1.0-amd64.iso
+# Tempo estimado: ~35 minutos
+# Espaço necessário: 30GB livres no D:
+```
+
+### O que o rebuild v2 faz:
+1. Cria workspace ext4 de 30GB no D: (evita limitação de disco da VM)
+2. Extrai MBR + EFI da ISO Kubuntu original via Python
+3. Extrai squashfs do BOOT_ISO (base com todos os pacotes)
+4. Remove `plasma-welcome` completamente
+5. Copia configs KDE reais do `/home/suporte` para `/home/ubuntu` + `/etc/skel`
+6. Instala Tchesco Welcome (PyQt6) + desativa autostart Kubuntu
+7. Corrige Plymouth no initrd (remove WhiteSur, força breeze-text)
+8. Recomprime squashfs
+9. Gera ISO bootável com xorriso (EFI + BIOS + El Torito)
+
+---
+
+## Live Session da ISO
+
+| Item | Valor |
+|---|---|
+| Usuário live | `ubuntu` |
+| Senha live | `tchesco` |
+| SDDM | Autologin (sem pedir senha) |
+| Welcome screen | Tchesco Welcome (PyQt6) com botões "Experimentar" e "Instalar Tchesco OS" |
+| Installer | Calamares com branding `tchesco` |
 
 ---
 
 ## Como Testar na VM
 
 ```bash
-# Copiar script para VM
-sshpass -p tchesco scp -r scripts/ suporte@192.168.0.24:~/tchesco-os/
+# Copiar scripts para VM
+sshpass -p tchesco scp -r scripts/ setup/ suporte@192.168.0.24:~/tchesco-os/
 
 # Rodar módulo específico
-sshpass -p tchesco ssh suporte@192.168.0.24 "cd ~/tchesco-os && sudo bash scripts/modules/04-gaming.sh"
+sshpass -p tchesco ssh suporte@192.168.0.24 \
+  "echo tchesco | sudo -S bash ~/tchesco-os/scripts/modules/04-gaming.sh"
 
 # Tirar screenshot da VM
 sshpass -p tchesco ssh suporte@192.168.0.24 "DISPLAY=:0 spectacle -b -n -o /tmp/screen.png"
 sshpass -p tchesco scp suporte@192.168.0.24:/tmp/screen.png /tmp/
+
+# Rodar orquestrador completo (idempotente)
+sshpass -p tchesco ssh suporte@192.168.0.24 \
+  "echo tchesco | sudo -S bash ~/tchesco-os/scripts/tchesco-install.sh"
 ```
 
 ---
@@ -170,14 +250,31 @@ sshpass -p tchesco ssh suporte@192.168.0.24 \
 
 ---
 
-## Próximas Fases
+## Status das Fases
 
 | Fase | Script | Status |
 |---|---|---|
-| Fase 5 | 04-gaming.sh | ⏳ Steam, Lutris, GameMode, MangoHud, ProtonUp-Qt, i386 |
-| Fase 6 | 05-office.sh | ⏳ LibreOffice, OnlyOffice, VLC, GIMP, OBS, Timeshift |
-| Fase 7 | 06-wine.sh | ⏳ Wine Staging, Winetricks, Bottles |
-| Fase 8 | consolidação | ⏳ Testes limpos completos |
-| Fase 9 | identidade | ⏳ /etc/os-release, "Sobre o Sistema" |
-| Fase 10 | ISO | ⏳ Cubic + Calamares |
-| Fase 11 | distribuição | ⏳ GitHub Releases |
+| Fase 0-1 | — | ✅ VM base + ambiente |
+| Fase 2 | 01-base.sh | ✅ Base Ubuntu, locale, timezone |
+| Fase 3 | 02-theme.sh | ✅ Visual macOS completo |
+| Fase 3.5 | 02b-i18n.sh | ✅ 11 idiomas + fcitx5 |
+| Fase 4 | 03-dev.sh | ✅ VS Code, Docker, Node, Rust, Go |
+| Fase 5 | 04-gaming.sh | ✅ Steam, Lutris, GameMode, MangoHud |
+| Fase 6 | 05-office.sh | ✅ LibreOffice, VLC, GIMP, OBS, Spotify |
+| Fase 7 | 06-wine.sh | ✅ Wine Staging 11.7, Winetricks, Bottles |
+| Fase 8 | consolidação | ✅ Orquestrador completo, idempotência 7/7 OK |
+| Fase 9 | 07-identity.sh | ✅ os-release, GRUB, fastfetch Tchesco |
+| Fase 10 | tchesco-rebuild-v2.sh | ✅ ISO 6.6GB bootável gerada |
+| Fase 11 | distribuição | ⏳ GitHub Releases, SHA256, instruções |
+
+---
+
+## Próximos Passos (v1.1)
+
+- Testar instalação completa com Calamares na VM limpa
+- Ajustar live session: usuário `tchesco` / senha `tchesco` (atualmente `ubuntu`/`tchesco`)
+- Verificar se tema WhiteSur carrega corretamente no live desktop
+- Corrigir nome "Install Kubuntu" que pode aparecer no Calamares
+- SHA256 da ISO para distribuição
+- GitHub Release com a ISO
+- Instruções de instalação no README

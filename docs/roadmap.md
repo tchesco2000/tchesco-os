@@ -175,36 +175,39 @@ Desenvolvimento em fases incrementais, cada uma validada na VM antes de avançar
 - [x] KDE "Sobre este Sistema" — automático via os-release (mostra Tchesco OS)
 - [x] apt intacto — lsb_release -cs = 'resolute' confirmado
 
-### Fase 10 — Geração da ISO ✅ SCRIPT PRONTO / AGUARDANDO TESTE
+### Fase 10 — Geração da ISO ✅ CONCLUÍDA
 
-`scripts/build-iso.sh`
+`scripts/tchesco-rebuild-v2.sh` ← **script definitivo**
 `setup/calamares/branding/tchesco/`
+`setup/welcome/` — Tchesco Welcome (PyQt6)
 
 > Abordagem: build automatizado via chroot + xorriso (sem Cubic).
-> ISO do Kubuntu 26.04 disponível em /media/sf_D_DRIVE/Downloads/kubuntu-26.04-desktop-amd64.iso
+> Workspace 30GB como loop image no D: para evitar limitação de disco da VM.
 
 **Como rodar:**
 ```bash
-sudo bash scripts/build-iso.sh \
-  /media/sf_D_DRIVE/Downloads/kubuntu-26.04-desktop-amd64.iso \
-  /media/sf_D_DRIVE/tchesco-os-1.0-amd64.iso \
-  gzip
+sshpass -p tchesco scp -r scripts/ setup/ suporte@192.168.0.24:~/tchesco-os/
+sshpass -p tchesco ssh suporte@192.168.0.24 \
+  "echo tchesco | sudo -S bash ~/tchesco-os/scripts/tchesco-rebuild-v2.sh 2>&1"
 ```
 
-- [x] Script `build-iso.sh` — extrai ISO, chroot, scripts, repack, xorriso
-- [x] Calamares branding — `branding.desc`, `show.qml`, logo.png, welcome.png
-- [x] Compressão configurável: `gzip` (rápido) ou `xz` (menor)
-- [x] Limpeza automática de espaço (apt cache + workspace)
-- [x] Build real executado na VM — **ISO gerada: 6.6GB**
-- [x] MD5: `3de804c7068aea6279da0e5fcd2903a1`
-- [x] ISO salva em `D:\tchesco-os-1.0-amd64.iso`
-- [ ] Teste de instalação em VM limpa
+- [x] Plymouth corrigido no initrd — `breeze-text`, sem logo Apple
+- [x] `plasma-welcome` removido com `apt purge`
+- [x] Configs KDE reais copiadas do suporte para live user
+- [x] Tchesco Welcome (PyQt6) — "Experimentar" e "Instalar Tchesco OS"
+- [x] Calamares branding `tchesco`
+- [x] GRUB: "Try or Install Tchesco OS"
+- [x] ISO: **6.6GB**, El Torito ✅, EFI + BIOS ✅
+- [x] Testada no VirtualBox — boot funcional
+- [ ] Teste instalação completa com Calamares em VM limpa
 
 ### Fase 11 — Distribuição ⏳ PRÓXIMA
 
+- [ ] Teste de instalação completa em VM limpa
 - [ ] SHA256 da ISO
-- [ ] GitHub Releases
-- [ ] Instruções de instalação
+- [ ] GitHub Release com ISO anexada
+- [ ] README com instruções de instalação
+- [ ] Distribuir para amigos para teste
 - [ ] Distribuir para amigos
 
 ---
