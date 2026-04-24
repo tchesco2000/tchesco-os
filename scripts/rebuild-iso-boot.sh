@@ -5,7 +5,7 @@ set -euo pipefail
 
 KUBUNTU_ISO="/media/sf_D_DRIVE/Downloads/kubuntu-26.04-desktop-amd64.iso"
 BOOT_ISO="/media/sf_D_DRIVE/tchesco-os-1.0-BOOT.iso"
-OUTPUT_ISO="/media/sf_D_DRIVE/tchesco-os-1.0-FINAL.iso"
+OUTPUT_ISO="/media/sf_D_DRIVE/tchesco-os-1.0-amd64.iso"
 OUTPUT_SQUASHFS="/media/sf_D_DRIVE/tchesco-fixed.squashfs"
 BUILD_DIR="/var/tmp/iso-build"        # só arquivos pequenos (~700MB) no disco local
 MBR_IMG="/var/tmp/kubuntu-mbr.img"
@@ -53,8 +53,11 @@ echo "[5/7] Extraindo squashfs no D: (~5 min)..."
 unsquashfs -d "$SQUASH_MNT/fs" /mnt/boot-iso/casper/filesystem.squashfs >> /var/log/tchesco-rebuild.log 2>&1
 
 echo "[5b] Corrigindo usuário live e SDDM..."
-chroot "$SQUASH_MNT/fs" bash -c "echo 'ubuntu:ubuntu' | chpasswd"
 
+# Senha live: tchesco:tchesco
+chroot "$SQUASH_MNT/fs" bash -c "echo 'ubuntu:tchesco' | chpasswd" 2>/dev/null || true
+
+# SDDM autologin
 cat > "$SQUASH_MNT/fs/etc/sddm.conf.d/30-tchesco-x11.conf" << 'SDDMEOF'
 [Autologin]
 User=ubuntu
@@ -63,6 +66,43 @@ Session=plasmax11
 [X11]
 MinimumVT=1
 SDDMEOF
+
+# Plymouth: remove WhiteSur, força breeze-text
+chroot "$SQUASH_MNT/fs" bash -c "
+    rm -rf /usr/share/plymouth/themes/whitesur* 2>/dev/null || true
+    if update-alternatives --list default.plymouth 2>/dev/null | grep -q breeze-text; then
+        update-alternatives --set default.plymouth /usr/share/plymouth/themes/breeze-text/breeze-text.plymouth
+    fi
+    update-initramfs -u 2>/dev/null || true
+" >> /var/log/tchesco-rebuild.log 2>&1
+
+# Instala o Tchesco Welcome
+echo "[5b2] Instalando Tchesco Welcome..."
+mkdir -p "$SQUASH_MNT/fs/opt/tchesco-setup"
+WELCOME_SRC="$(find /home /root -name "tchesco-welcome" -path "*/setup/welcome/*" 2>/dev/null | head -1 | xargs dirname)"
+cp "$WELCOME_SRC/tchesco-welcome"                      "$SQUASH_MNT/fs/opt/tchesco-setup/"
+cp "$WELCOME_SRC/tchesco-welcome.desktop"              "$SQUASH_MNT/fs/opt/tchesco-setup/"
+cp "$WELCOME_SRC/tchesco-welcome-autostart.desktop"    "$SQUASH_MNT/fs/opt/tchesco-setup/"
+cp "$WELCOME_SRC/install-welcome.sh"                   "$SQUASH_MNT/fs/opt/tchesco-setup/"
+
+chroot "$SQUASH_MNT/fs" bash /opt/tchesco-setup/install-welcome.sh >> /var/log/tchesco-rebuild.log 2>&1
+
+# Copia configs KDE do ubuntu para /etc/skel (garante tema no live)
+echo "[5b3] Sincronizando configs KDE para /etc/skel..."
+for dir in .config .local/share/plasma .local/share/color-schemes; do
+    if [[ -d "$SQUASH_MNT/fs/home/ubuntu/$dir" ]]; then
+        mkdir -p "$SQUASH_MNT/fs/etc/skel/$dir"
+        rsync -a "$SQUASH_MNT/fs/home/ubuntu/$dir/" "$SQUASH_MNT/fs/etc/skel/$dir/" 2>/dev/null || true
+    fi
+done
+
+# Calamares: garante branding tchesco
+CALAMARES_CONF="$SQUASH_MNT/fs/etc/calamares/settings.conf"
+if [[ -f "$CALAMARES_CONF" ]]; then
+    sed -i 's/branding: kubuntu/branding: tchesco/g' "$CALAMARES_CONF"
+    sed -i 's/branding: ubuntu/branding: tchesco/g' "$CALAMARES_CONF"
+    echo "Calamares branding: tchesco"
+fi
 
 echo "[5c] Recomprimindo squashfs → D: (~15 min)..."
 mksquashfs "$SQUASH_MNT/fs" "$OUTPUT_SQUASHFS" -comp gzip -noappend

@@ -1,0 +1,194 @@
+#!/usr/bin/env python3
+# Tchesco OS — Welcome Screen
+import sys
+import subprocess
+import os
+from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
+                              QPushButton, QLabel, QFrame)
+from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtGui import QFont, QPixmap, QIcon, QPalette, QColor, QPainter, QLinearGradient
+from PyQt6.QtSvgWidgets import QSvgWidget
+
+LOGO_PATH = "/usr/share/tchesco/logo/tchesco-icon-kde.svg"
+BG_COLOR  = "#0e1117"
+ACCENT    = "#3d85c8"
+TEXT      = "#ffffff"
+SUBTEXT   = "#aaaaaa"
+
+STYLESHEET = f"""
+QWidget {{
+    background-color: {BG_COLOR};
+    color: {TEXT};
+    font-family: 'Inter', 'Noto Sans', sans-serif;
+}}
+
+QPushButton {{
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: bold;
+    padding: 14px 40px;
+    border: none;
+}}
+
+QPushButton#btn_install {{
+    background-color: {ACCENT};
+    color: white;
+}}
+
+QPushButton#btn_install:hover {{
+    background-color: #4a96d9;
+}}
+
+QPushButton#btn_install:pressed {{
+    background-color: #2d6fa8;
+}}
+
+QPushButton#btn_try {{
+    background-color: transparent;
+    color: {SUBTEXT};
+    border: 1px solid #333344;
+    font-size: 14px;
+    font-weight: normal;
+    padding: 10px 30px;
+}}
+
+QPushButton#btn_try:hover {{
+    background-color: #1a2035;
+    color: {TEXT};
+    border-color: #555566;
+}}
+
+QLabel#lbl_title {{
+    font-size: 36px;
+    font-weight: bold;
+    color: {TEXT};
+}}
+
+QLabel#lbl_subtitle {{
+    font-size: 16px;
+    color: {SUBTEXT};
+    line-height: 1.6;
+}}
+
+QLabel#lbl_version {{
+    font-size: 13px;
+    color: #555566;
+}}
+
+QFrame#separator {{
+    background-color: #1a2035;
+    max-height: 1px;
+}}
+"""
+
+class TchecoWelcome(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Bem-vindo ao Tchesco OS")
+        self.setMinimumSize(700, 480)
+        self.resize(700, 480)
+        self.setStyleSheet(STYLESHEET)
+        self._center()
+        self._build_ui()
+
+    def _center(self):
+        screen = QApplication.primaryScreen().geometry()
+        x = (screen.width()  - 700) // 2
+        y = (screen.height() - 480) // 2
+        self.move(x, y)
+
+    def _build_ui(self):
+        root = QVBoxLayout(self)
+        root.setContentsMargins(60, 50, 60, 40)
+        root.setSpacing(0)
+
+        # ── Logo + título ──────────────────────────────────────────────────
+        top = QHBoxLayout()
+        top.setSpacing(28)
+
+        if os.path.exists(LOGO_PATH):
+            logo = QSvgWidget(LOGO_PATH)
+            logo.setFixedSize(80, 80)
+            top.addWidget(logo, 0, Qt.AlignmentFlag.AlignVCenter)
+        else:
+            placeholder = QLabel("T")
+            placeholder.setFixedSize(80, 80)
+            placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            placeholder.setStyleSheet(f"font-size:48px; font-weight:bold; color:{ACCENT}; background:#1a2035; border-radius:12px;")
+            top.addWidget(placeholder, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        title_col = QVBoxLayout()
+        title_col.setSpacing(4)
+
+        title = QLabel("Tchesco OS")
+        title.setObjectName("lbl_title")
+        title_col.addWidget(title)
+
+        version = QLabel("Versão 1.0 · baseado em Kubuntu 26.04 LTS")
+        version.setObjectName("lbl_version")
+        title_col.addWidget(version)
+
+        top.addLayout(title_col)
+        top.addStretch()
+        root.addLayout(top)
+
+        root.addSpacing(32)
+
+        # ── Separador ─────────────────────────────────────────────────────
+        sep = QFrame()
+        sep.setObjectName("separator")
+        sep.setFrameShape(QFrame.Shape.HLine)
+        root.addWidget(sep)
+
+        root.addSpacing(28)
+
+        # ── Descrição ─────────────────────────────────────────────────────
+        desc = QLabel(
+            "Bem-vindo ao Tchesco OS — uma distribuição Linux com visual macOS,\n"
+            "pronta para desenvolvimento, jogos, produtividade e multimídia.\n\n"
+            "Experimente o sistema ao vivo ou instale no seu computador."
+        )
+        desc.setObjectName("lbl_subtitle")
+        desc.setWordWrap(True)
+        root.addWidget(desc)
+
+        root.addStretch()
+
+        # ── Botões ────────────────────────────────────────────────────────
+        btns = QHBoxLayout()
+        btns.setSpacing(16)
+
+        btn_try = QPushButton("  Experimentar ao vivo")
+        btn_try.setObjectName("btn_try")
+        btn_try.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_try.clicked.connect(self.close)
+        btns.addWidget(btn_try)
+
+        btns.addStretch()
+
+        btn_install = QPushButton("  Instalar Tchesco OS")
+        btn_install.setObjectName("btn_install")
+        btn_install.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_install.clicked.connect(self._launch_installer)
+        btns.addWidget(btn_install)
+
+        root.addLayout(btns)
+
+    def _launch_installer(self):
+        self.close()
+        subprocess.Popen(
+            ["calamares"],
+            env={**os.environ, "DISPLAY": os.environ.get("DISPLAY", ":0")}
+        )
+
+
+def main():
+    app = QApplication(sys.argv)
+    app.setApplicationName("tchesco-welcome")
+    w = TchecoWelcome()
+    w.show()
+    sys.exit(app.exec())
+
+
+if __name__ == "__main__":
+    main()

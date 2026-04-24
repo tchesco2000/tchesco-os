@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Bem-vindo ao Tchesco OS
+Comment=Tela de boas-vindas do Tchesco OS
+Exec=/usr/local/bin/tchesco-welcome
+Icon=/usr/share/tchesco/logo/tchesco-icon-kde.svg
+Categories=System;
+StartupNotify=false

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Tchesco OS Welcome
+Exec=/usr/local/bin/tchesco-welcome
+Icon=/usr/share/tchesco/logo/tchesco-icon-kde.svg
+X-KDE-autostart-phase=2
+X-KDE-autostart-condition=tchesco-welcome:Main:firstRun:true
+OnlyShowIn=KDE;
+AutostartCondition=if-session-is-live
+StartupNotify=false
