@@ -120,16 +120,19 @@ add_ppas() {
         apt-get install -y -qq software-properties-common >> "$LOG_FILE" 2>&1
     fi
 
-    # PPA kisak-mesa — Mesa mais recente para AMD e Intel (melhor Vulkan)
-    if ! grep -rq "kisak-mesa" /etc/apt/sources.list.d/ 2>/dev/null; then
-        info "Adicionando PPA kisak-mesa (drivers gráficos recentes)..."
-        add-apt-repository -y ppa:kisak/kisak-mesa >> "$LOG_FILE" 2>&1
-        ok "PPA kisak-mesa adicionado"
-    else
-        warn "PPA kisak-mesa já está configurado, pulando"
+    # NOTA: PPA kisak-mesa (drivers Mesa recentes para AMD/Intel) foi movido para
+    # 04-gaming.sh, onde faz mais sentido semanticamente. Antes de ativá-lo,
+    # verificar se já tem suporte para Ubuntu 26.04 (Resolute) em:
+    # https://launchpad.net/~kisak/+archive/ubuntu/kisak-mesa
+
+    # Remove entrada quebrada do kisak-mesa caso tenha sobrado de tentativa anterior
+    if grep -rq "kisak-mesa" /etc/apt/sources.list.d/ 2>/dev/null; then
+        warn "Removendo entrada antiga do kisak-mesa (sem suporte para esta versão)..."
+        rm -f /etc/apt/sources.list.d/*kisak* 2>/dev/null || true
+        log "Entrada kisak-mesa removida de sources.list.d"
     fi
 
-    info "Atualizando lista de pacotes após PPAs..."
+    info "Atualizando lista de pacotes..."
     apt-get update -qq >> "$LOG_FILE" 2>&1
 
     ok "PPAs configurados"
