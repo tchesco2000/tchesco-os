@@ -459,13 +459,25 @@ PYEOF
 setup_firefox_global_menu() {
     step "Configurando Firefox para Global Menu"
 
-    # Firefox deb precisa de 2 coisas para exportar menus via DBus:
-    # 1) ui.use_unity_menubar=true (pref interna)
-    # 2) browser.tabs.inTitlebar=0 (barra de título do sistema, não customizada)
-    # Via autoconfig aplica em todos os perfis automaticamente.
+    # Firefox deb precisa de 3 coisas para exportar menus no KDE Plasma Wayland:
+    # 1) MOZ_ENABLE_WAYLAND=0 — Firefox em Wayland NATIVO não exporta menus DBus,
+    #    precisa rodar em X11 (XWayland)
+    # 2) GTK_MODULES=appmenu-gtk-module — carrega o exporter de menus
+    # 3) ui.use_unity_menubar=true — pref interna do Firefox
 
     local ff_root="/usr/lib/firefox"
     [[ ! -d "$ff_root" ]] && { warn "Firefox deb não encontrado — pulando"; return 0; }
+
+    # Sobrescreve o .desktop do Firefox com env vars X11 + GTK_MODULES
+    local user_apps="$REAL_HOME/.local/share/applications"
+    as_user mkdir -p "$user_apps"
+    if [[ -f /usr/share/applications/firefox.desktop ]]; then
+        cp /usr/share/applications/firefox.desktop "$user_apps/firefox.desktop"
+        # Troca Exec=firefox (qualquer variante) por Exec=env MOZ_ENABLE_WAYLAND=0 GTK_MODULES=... firefox
+        sed -i 's|^Exec=/usr/bin/firefox|Exec=env MOZ_ENABLE_WAYLAND=0 GTK_MODULES=appmenu-gtk-module /usr/bin/firefox|g' "$user_apps/firefox.desktop"
+        sed -i 's|^Exec=firefox|Exec=env MOZ_ENABLE_WAYLAND=0 GTK_MODULES=appmenu-gtk-module firefox|g' "$user_apps/firefox.desktop"
+        chown "$REAL_USER:$REAL_USER" "$user_apps/firefox.desktop"
+    fi
 
     # policies.json (preferences com Status=default permitem usuário mudar depois)
     mkdir -p "$ff_root/distribution"
@@ -498,7 +510,7 @@ defaultPref("ui.use_unity_menubar", true);
 defaultPref("browser.tabs.inTitlebar", 0);
 EOF
 
-    ok "Firefox configurado para mostrar menus no Global Menu"
+    ok "Firefox configurado (X11 + GTK_MODULES + menubar pref)"
 }
 
 setup_plymouth() {
@@ -591,7 +603,7 @@ thickness=44
 [PlasmaViews][Panel 50]
 floating=1
 panelLengthMode=1
-panelVisibility=2
+panelVisibility=1
 
 [PlasmaViews][Panel 50][Defaults]
 thickness=56
