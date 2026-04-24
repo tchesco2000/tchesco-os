@@ -727,11 +727,12 @@ configure_plank_dock() {
     local plank_dir="$REAL_HOME/.config/plank/dock1"
     as_user mkdir -p "$plank_dir/launchers"
 
-    # Configuração do dock: centralizado (Alignment=3 = Center), autohide com hover,
+    # Configuração do dock: centralizado, esconde SÓ quando janela sobrepõe,
     # zoom 150%, posição bottom, tema transparente, ícones 48px
-    # HideMode=2 = AutoHide real (some sempre, hover-to-show funciona garantido)
-    # Alignment=3 = Center, Position=3 = Bottom
-    # Zoom 150% = ícones crescem ao passar mouse (igual macOS)
+    # HideMode=1 (Intelligent) = visível no desktop vazio, esconde quando app cobre,
+    # hover na borda inferior SEMPRE revela (comportamento macOS). HideMode=2 (AutoHide
+    # total) foi descartado porque apps maximizados bloqueiam o hover de unhide.
+    # PressureReveal=true ajuda em apps fullscreen onde o "edge" vira zona morta.
     cat > "$plank_dir/settings" << 'EOF'
 [PlankDockPreferences]
 CurrentWorkspaceOnly=false
@@ -742,13 +743,13 @@ Theme=Transparent
 Position=3
 ShowDockItem=false
 HideDelay=0
-HideMode=2
+HideMode=1
 UnhideDelay=0
 Alignment=3
 Offset=0
 ZoomEnabled=true
 ZoomPercent=150
-PressureReveal=false
+PressureReveal=true
 PinnedOnly=false
 AutoPinning=false
 ShowOnClick=false
