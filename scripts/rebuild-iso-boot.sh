@@ -1,21 +1,28 @@
 #!/usr/bin/env bash
 # Reconstrói a ISO Tchesco OS com boot EFI+BIOS correto
+# Estratégia: squashfs fica inteiramente no D: (loop image) — disco local só guarda ~700MB
 set -euo pipefail
 
 KUBUNTU_ISO="/media/sf_D_DRIVE/Downloads/kubuntu-26.04-desktop-amd64.iso"
 BOOT_ISO="/media/sf_D_DRIVE/tchesco-os-1.0-BOOT.iso"
 OUTPUT_ISO="/media/sf_D_DRIVE/tchesco-os-1.0-FINAL.iso"
-BUILD_DIR="/var/tmp/iso-build"
+OUTPUT_SQUASHFS="/media/sf_D_DRIVE/tchesco-fixed.squashfs"
+BUILD_DIR="/var/tmp/iso-build"        # só arquivos pequenos (~700MB) no disco local
 MBR_IMG="/var/tmp/kubuntu-mbr.img"
 EFI_IMG="/var/tmp/kubuntu-efi.img"
+SQUASH_LOOP="/media/sf_D_DRIVE/squash-fix.img"   # 15GB no D: para unsquash+resquash
+SQUASH_MNT="/mnt/squash-fix"
 
-echo "[1/6] Limpeza..."
-rm -f /tmp/tchesco.squashfs /tmp/tchesco.manifest /tmp/tchesco.size /tmp/tchesco-md5.txt
-rm -f /var/tmp/kubuntu-mbr.img /var/tmp/kubuntu-efi.img
+# ─── Limpeza ──────────────────────────────────────────────────────────────────
+echo "[1/7] Limpeza..."
+umount "$SQUASH_MNT" 2>/dev/null || true
+rm -f "$SQUASH_LOOP" "$OUTPUT_SQUASHFS"
+rm -f "$MBR_IMG" "$EFI_IMG"
 rm -rf "$BUILD_DIR"
 df -h / | tail -1
 
-echo "[2/6] Extraindo MBR (432 bytes) e EFI (5MB) via Python..."
+# ─── MBR + EFI via Python ─────────────────────────────────────────────────────
+echo "[2/7] Extraindo MBR e EFI via Python..."
 python3 - << 'PYEOF'
 with open("/media/sf_D_DRIVE/Downloads/kubuntu-26.04-desktop-amd64.iso", "rb") as f:
     mbr = f.read(432)
@@ -25,32 +32,60 @@ with open("/var/tmp/kubuntu-mbr.img", "wb") as f: f.write(mbr)
 with open("/var/tmp/kubuntu-efi.img", "wb") as f: f.write(efi)
 print(f"MBR: {len(mbr)} bytes  EFI: {len(efi)} bytes")
 PYEOF
-
 ls -lh "$MBR_IMG" "$EFI_IMG"
 
-echo "[3/6] Montando ISOs..."
-mkdir -p /mnt/kub-iso /mnt/boot-iso
+# ─── Monta ISOs ───────────────────────────────────────────────────────────────
+echo "[3/7] Montando ISOs..."
+mkdir -p /mnt/kub-iso /mnt/boot-iso "$SQUASH_MNT"
 mount -o loop,ro "$KUBUNTU_ISO" /mnt/kub-iso  || true
 mount -o loop,ro "$BOOT_ISO"    /mnt/boot-iso || true
 ls -lh /mnt/boot-iso/casper/filesystem.squashfs
 
-echo "[4/6] Preparando diretório de build (rsync sem squashfs ~500MB)..."
+# ─── Loop image no D: para o squashfs ─────────────────────────────────────────
+echo "[4/7] Criando loop image 15GB no D: para operações squashfs..."
+truncate -s 15G "$SQUASH_LOOP"
+mkfs.ext4 -F "$SQUASH_LOOP" >> /var/log/tchesco-rebuild.log 2>&1
+mount -o loop "$SQUASH_LOOP" "$SQUASH_MNT"
+echo "Loop montado: $(df -h "$SQUASH_MNT" | tail -1)"
+
+# ─── Unsquash → fix → resquash (tudo no D:) ───────────────────────────────────
+echo "[5/7] Extraindo squashfs no D: (~5 min)..."
+unsquashfs -d "$SQUASH_MNT/fs" /mnt/boot-iso/casper/filesystem.squashfs >> /var/log/tchesco-rebuild.log 2>&1
+
+echo "[5b] Corrigindo usuário live e SDDM..."
+chroot "$SQUASH_MNT/fs" bash -c "echo 'ubuntu:ubuntu' | chpasswd"
+
+cat > "$SQUASH_MNT/fs/etc/sddm.conf.d/30-tchesco-x11.conf" << 'SDDMEOF'
+[Autologin]
+User=ubuntu
+Session=plasmax11
+
+[X11]
+MinimumVT=1
+SDDMEOF
+
+echo "[5c] Recomprimindo squashfs → D: (~15 min)..."
+mksquashfs "$SQUASH_MNT/fs" "$OUTPUT_SQUASHFS" -comp gzip -noappend
+echo "squashfs: $(ls -lh "$OUTPUT_SQUASHFS" | awk '{print $5}')"
+
+umount "$SQUASH_MNT"
+rm -f "$SQUASH_LOOP"
+
+# ─── Diretório de build local (só ~700MB) ─────────────────────────────────────
+echo "[6/7] Preparando build dir local (exceto squashfs)..."
 mkdir -p "$BUILD_DIR/casper"
 rsync -a --exclude="casper/filesystem.squashfs" /mnt/kub-iso/ "$BUILD_DIR/"
 echo "rsync: $(du -sh "$BUILD_DIR" | cut -f1)"
 
-echo "[4b] Corrigindo textos do GRUB..."
+# Corrige GRUB labels
 sed -i 's/Try or Install Kubuntu/Try or Install Tchesco OS/g' "$BUILD_DIR/boot/grub/grub.cfg"
 sed -i 's/Kubuntu (safe graphics)/Tchesco OS (safe graphics)/g' "$BUILD_DIR/boot/grub/grub.cfg"
 sed -i 's/Try or Install Kubuntu/Try or Install Tchesco OS/g' "$BUILD_DIR/boot/grub/loopback.cfg" 2>/dev/null || true
 sed -i 's/Kubuntu (safe graphics)/Tchesco OS (safe graphics)/g' "$BUILD_DIR/boot/grub/loopback.cfg" 2>/dev/null || true
-
-echo "[5/6] Copiando squashfs Tchesco (5.9GB)..."
-cp /mnt/boot-iso/casper/filesystem.squashfs "$BUILD_DIR/casper/filesystem.squashfs"
-echo "squashfs: $(ls -lh "$BUILD_DIR/casper/filesystem.squashfs" | awk '{print $5}')"
 df -h / | tail -1
 
-echo "[6/6] Gerando ISO bootável com xorriso..."
+# ─── xorriso com graft-point para squashfs no D: ──────────────────────────────
+echo "[7/7] Gerando ISO bootável..."
 xorriso -as mkisofs \
     -r -J \
     -iso-level 3 \
@@ -74,7 +109,9 @@ xorriso -as mkisofs \
     -boot-load-size 10296 \
     -V TCHESCO_OS_1_0 \
     -o "$OUTPUT_ISO" \
-    "$BUILD_DIR"
+    -graft-points \
+    "$BUILD_DIR" \
+    "casper/filesystem.squashfs=$OUTPUT_SQUASHFS"
 
 echo ""
 echo "=== Verificação ==="
@@ -86,5 +123,5 @@ md5sum "$OUTPUT_ISO"
 echo ""
 echo "=== Cleanup ==="
 umount /mnt/kub-iso /mnt/boot-iso 2>/dev/null || true
-rm -rf "$BUILD_DIR" "$MBR_IMG" "$EFI_IMG"
+rm -rf "$BUILD_DIR" "$MBR_IMG" "$EFI_IMG" "$OUTPUT_SQUASHFS"
 echo "Feito!"
