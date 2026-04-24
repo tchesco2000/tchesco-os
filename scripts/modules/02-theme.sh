@@ -2,8 +2,11 @@
 # Módulo 02 — Tema visual macOS (WhiteSur + dock nativo KDE Plasma 6)
 # Fase 3 do roadmap: tema GTK, KDE Plasma 6, ícones, cursores, painéis e splash
 #
-# Dock: usa org.kde.plasma.icontasks (nativo KDE, funciona em Wayland).
-# Plank foi descartado — não tem suporte Wayland no Kubuntu 26.04.
+# Sessão: X11 (plasmax11) — escolha consciente, não Wayland
+#   Motivo: Plasma 6 Wayland tem bugs com AutoHide do dock e Global Menu de apps GTK.
+#   X11 funciona sem esses problemas e entrega a experiência macOS-like esperada.
+#
+# Dock: org.kde.plasma.icontasks com panelVisibility=1 (AutoHide + hover-to-show).
 
 set -euo pipefail
 
@@ -107,6 +110,9 @@ install_deps() {
         gnome-themes-extra  # Temas extras GTK
         gtk2-engines-murrine
         gtk2-engines-pixbuf
+        # Sessão X11 (escolha consciente do Tchesco OS — Wayland tem bugs de UX)
+        plasma-session-x11
+        kwin-x11
     )
 
     local to_install=()
@@ -459,27 +465,13 @@ PYEOF
 setup_firefox_global_menu() {
     step "Configurando Firefox para Global Menu"
 
-    # Firefox deb precisa de 3 coisas para exportar menus no KDE Plasma Wayland:
-    # 1) MOZ_ENABLE_WAYLAND=0 — Firefox em Wayland NATIVO não exporta menus DBus,
-    #    precisa rodar em X11 (XWayland)
-    # 2) GTK_MODULES=appmenu-gtk-module — carrega o exporter de menus
-    # 3) ui.use_unity_menubar=true — pref interna do Firefox
+    # Em X11, GTK_MODULES=appmenu-gtk-module permite export de menus via DBus.
+    # Sessão toda é X11 (plasmax11) — não precisa de workaround no .desktop.
 
     local ff_root="/usr/lib/firefox"
     [[ ! -d "$ff_root" ]] && { warn "Firefox deb não encontrado — pulando"; return 0; }
 
-    # Sobrescreve o .desktop do Firefox com env vars X11 + GTK_MODULES
-    local user_apps="$REAL_HOME/.local/share/applications"
-    as_user mkdir -p "$user_apps"
-    if [[ -f /usr/share/applications/firefox.desktop ]]; then
-        cp /usr/share/applications/firefox.desktop "$user_apps/firefox.desktop"
-        # Troca Exec=firefox (qualquer variante) por Exec=env MOZ_ENABLE_WAYLAND=0 GTK_MODULES=... firefox
-        sed -i 's|^Exec=/usr/bin/firefox|Exec=env MOZ_ENABLE_WAYLAND=0 GTK_MODULES=appmenu-gtk-module /usr/bin/firefox|g' "$user_apps/firefox.desktop"
-        sed -i 's|^Exec=firefox|Exec=env MOZ_ENABLE_WAYLAND=0 GTK_MODULES=appmenu-gtk-module firefox|g' "$user_apps/firefox.desktop"
-        chown "$REAL_USER:$REAL_USER" "$user_apps/firefox.desktop"
-    fi
-
-    # policies.json (preferences com Status=default permitem usuário mudar depois)
+    # policies.json (defaults ficam mutáveis pelo usuário)
     mkdir -p "$ff_root/distribution"
     cat > "$ff_root/distribution/policies.json" << 'EOF'
 {
@@ -498,7 +490,7 @@ setup_firefox_global_menu() {
 }
 EOF
 
-    # autoconfig (mais forte que policies — aplica antes da UI carregar)
+    # autoconfig aplica antes da UI carregar
     cat > "$ff_root/defaults/pref/autoconfig.js" << 'EOF'
 pref("general.config.filename", "tchesco.cfg");
 pref("general.config.obscure_value", 0);
@@ -510,7 +502,29 @@ defaultPref("ui.use_unity_menubar", true);
 defaultPref("browser.tabs.inTitlebar", 0);
 EOF
 
-    ok "Firefox configurado (X11 + GTK_MODULES + menubar pref)"
+    ok "Firefox configurado (Global Menu em X11)"
+}
+
+switch_sddm_to_x11() {
+    step "Configurando SDDM para sessão X11 (plasmax11)"
+
+    # O Kubuntu 26.04 vem com DisplayServer=wayland.
+    # Tchesco OS usa X11 para garantir AutoHide do dock + Global Menu do Firefox funcionando.
+
+    cat > /etc/sddm.conf.d/10-wayland.conf << 'EOF'
+[General]
+DisplayServer=x11
+
+[X11]
+EOF
+
+    # Se tiver autologin configurado, troca Session=plasma (Wayland) para plasmax11 (X11)
+    if grep -rq "^Session=plasma$" /etc/sddm.conf /etc/sddm.conf.d/ 2>/dev/null; then
+        sed -i "s/^Session=plasma$/Session=plasmax11/g" /etc/sddm.conf 2>/dev/null || true
+        sed -i "s/^Session=plasma$/Session=plasmax11/g" /etc/sddm.conf.d/*.conf 2>/dev/null || true
+    fi
+
+    ok "SDDM agora usa sessão X11 (plasmax11) — reiniciar para aplicar"
 }
 
 setup_plymouth() {
@@ -814,6 +828,7 @@ main() {
     setup_global_menu
     replace_firefox_snap
     setup_firefox_global_menu
+    switch_sddm_to_x11
     configure_top_panel
     cleanup
     print_summary
