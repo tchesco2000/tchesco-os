@@ -159,6 +159,22 @@ check_root() { [[ $EUID -eq 0 ]] || die "Execute como root: sudo $0"; }
 - **Causa:** `/tmp` é tmpfs limitado a metade da RAM (~3.9GB).
 - **Fix:** Usar `/var/tmp` (ext4) ou criar loop image no D: para workspace de build.
 
+### Bug 14 — Tela inicial ISO mostra "Try Kubuntu / Install Kubuntu"
+- **Causa:** O Calamares tem seu próprio welcome screen embutido (`calamares-welcome`) separado do `plasma-welcome`. Remover `plasma-welcome` não resolve.
+- **Fix (v1.1):** Editar `/usr/share/calamares/modules/welcome.conf` no squashfs para mudar `appName` e `appVersion`. Ou substituir o módulo welcome do Calamares pelo nosso Tchesco Welcome como tela inicial.
+
+### Bug 15 — Botão "Instalar Tchesco OS" não abre o Calamares
+- **Causa:** No live session, `calamares` precisa de privilégios root. Chamar `calamares` diretamente falha silenciosamente.
+- **Fix (v1.1):** Usar `pkexec calamares` ou `sudo -E calamares` no `tchesco-welcome` ao clicar em instalar.
+
+### Bug 16 — Plank não aparece no live desktop
+- **Causa:** O autostart do Plank existe (`~/.config/autostart/plank.desktop`) mas o live session KDE não tem `XDG_SESSION_TYPE=x11` definido no ambiente do autostart, então o Plank recusa iniciar.
+- **Fix (v1.1):** No `plank.desktop` de autostart, adicionar `Exec=env XDG_SESSION_TYPE=x11 DESKTOP_SESSION=plasmax11 plank` em vez de apenas `Exec=plank`.
+
+### Bug 17 — Menu do live mostra "Install Kubuntu 26.04 (OEM mode)"
+- **Causa:** O arquivo `/usr/share/applications/calamares.desktop` ainda tem o nome "Install Kubuntu" do pacote original.
+- **Fix (v1.1):** No rebuild, fazer `sed -i 's/Install Kubuntu/Instalar Tchesco OS/g'` no arquivo `.desktop` do Calamares dentro do squashfs.
+
 ---
 
 ## Configuração Visual Validada (Estado atual da VM)
@@ -271,10 +287,14 @@ sshpass -p tchesco ssh suporte@192.168.0.24 \
 
 ## Próximos Passos (v1.1)
 
-- Testar instalação completa com Calamares na VM limpa
-- Ajustar live session: usuário `tchesco` / senha `tchesco` (atualmente `ubuntu`/`tchesco`)
-- Verificar se tema WhiteSur carrega corretamente no live desktop
-- Corrigir nome "Install Kubuntu" que pode aparecer no Calamares
-- SHA256 da ISO para distribuição
-- GitHub Release com a ISO
-- Instruções de instalação no README
+Pendências identificadas no teste da ISO v1.0:
+
+| # | Problema | Fix |
+|---|---|---|
+| 1 | Tela inicial "Try Kubuntu / Install Kubuntu" | Editar `welcome.conf` do Calamares no squashfs |
+| 2 | Botão "Instalar Tchesco OS" não abre Calamares | Usar `pkexec calamares` no `tchesco-welcome` |
+| 3 | Plank não aparece no live | Adicionar `env XDG_SESSION_TYPE=x11` no `plank.desktop` de autostart |
+| 4 | Menu mostra "Install Kubuntu 26.04" | `sed` no `calamares.desktop` dentro do squashfs |
+| 5 | Usuário live ainda é `ubuntu` | Renomear via casper ou criar usuário `tchesco` |
+
+Todos os 5 fixes vão no `tchesco-rebuild-v2.sh` na etapa `[5/9]`.
