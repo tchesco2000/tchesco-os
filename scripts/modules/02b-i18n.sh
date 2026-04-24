@@ -248,7 +248,6 @@ install_spellcheck() {
         hunspell-es
         hunspell-fr
         hunspell-de-de
-        myspell-pt-br
     )
 
     local to_install=()
