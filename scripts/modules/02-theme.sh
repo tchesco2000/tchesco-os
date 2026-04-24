@@ -518,13 +518,32 @@ DisplayServer=x11
 [X11]
 EOF
 
-    # Se tiver autologin configurado, troca Session=plasma (Wayland) para plasmax11 (X11)
+    # Força plasmax11 como sessão do autologin (garante que loga em X11 todo boot)
+    cat > /etc/sddm.conf.d/30-tchesco-x11.conf << EOF
+[Autologin]
+User=$REAL_USER
+Session=plasmax11
+Relogin=false
+EOF
+
+    # Esconde a sessão Wayland (não aparece como opção na tela de login)
+    # Via override em /etc/xdg (não modifica arquivo do pacote plasma-workspace)
+    mkdir -p /etc/xdg/wayland-sessions
+    cat > /etc/xdg/wayland-sessions/plasma.desktop << 'EOF'
+[Desktop Entry]
+Hidden=true
+EOF
+
+    # Limpa cache do SDDM que lembra a última sessão escolhida pelo usuário
+    rm -rf "/var/lib/sddm/.cache/$REAL_USER" 2>/dev/null || true
+
+    # Se tiver Session=plasma (Wayland) em outros conf, troca para plasmax11
     if grep -rq "^Session=plasma$" /etc/sddm.conf /etc/sddm.conf.d/ 2>/dev/null; then
         sed -i "s/^Session=plasma$/Session=plasmax11/g" /etc/sddm.conf 2>/dev/null || true
         sed -i "s/^Session=plasma$/Session=plasmax11/g" /etc/sddm.conf.d/*.conf 2>/dev/null || true
     fi
 
-    ok "SDDM agora usa sessão X11 (plasmax11) — reiniciar para aplicar"
+    ok "SDDM agora força X11 — Wayland escondido, autologin plasmax11"
 }
 
 setup_plymouth() {
