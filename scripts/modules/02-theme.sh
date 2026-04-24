@@ -766,7 +766,7 @@ Name=Widgets
 Name[pt_BR]=Widgets
 Comment=Adicionar widgets ao desktop
 Comment[pt_BR]=Adicionar widgets ao desktop
-Icon=plasma
+Icon=preferences-desktop-plasma
 Exec=qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.toggleWidgetExplorer
 Categories=Utility;
 StartupNotify=false
@@ -815,77 +815,61 @@ X-KDE-autostart-after=panel
 EOF
     chown "$REAL_USER:$REAL_USER" "$autostart_dir/plank.desktop"
 
-    # Esconde o Plasma Toolbox (botão 48x48 "Add Widgets") que não responde
-    # a nenhuma config e ignora opacity=0 (window type DOCK + KDE_OVERRIDE).
-    # Solução: compilar helper C que usa XUnmapWindow diretamente + daemon.
+    # Remove artefatos de tentativas anteriores de esconder o Plasma Toolbox via XUnmap
+    # (hoje o botão "Add Widgets" é prevenido via limpeza de Containments residuais em
+    # cleanup_residual_panels(), então o daemon/helper não é mais necessário)
+    rm -f "$REAL_HOME/.local/bin/tchesco-unmap" \
+          "$REAL_HOME/.local/bin/tchesco-hide-toolbox.sh" \
+          "$autostart_dir/tchesco-hide-toolbox.desktop"
 
-    # Dependências: x11-utils (xwininfo), libx11-dev + gcc (compilação)
-    local deps=(x11-utils gcc libx11-dev)
-    local to_install=()
-    for p in "${deps[@]}"; do
-        dpkg -s "$p" &>/dev/null 2>&1 || to_install+=("$p")
-    done
-    [[ ${#to_install[@]} -gt 0 ]] && \
-        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${to_install[@]}" >> "$LOG_FILE" 2>&1
-
-    as_user mkdir -p "$REAL_HOME/.local/bin"
-
-    # Compila helper C (XUnmapWindow via Xlib — única coisa que funciona em DOCK windows)
-    local unmap_src="/tmp/tchesco-unmap.c"
-    cat > "$unmap_src" << 'EOF'
-#include <X11/Xlib.h>
-#include <stdlib.h>
-int main(int argc, char **argv) {
-    if (argc < 2) return 1;
-    Display *d = XOpenDisplay(NULL);
-    if (!d) return 1;
-    Window w = strtoul(argv[1], NULL, 16);
-    XUnmapWindow(d, w);
-    XFlush(d);
-    XCloseDisplay(d);
-    return 0;
+    ok "Plank configurado: 8 apps + autohide + zoom"
 }
-EOF
-    gcc "$unmap_src" -o "$REAL_HOME/.local/bin/tchesco-unmap" -lX11 2>> "$LOG_FILE"
-    chown "$REAL_USER:$REAL_USER" "$REAL_HOME/.local/bin/tchesco-unmap"
-    chmod +x "$REAL_HOME/.local/bin/tchesco-unmap"
 
-    # Daemon que detecta e esconde o toolbox sempre que aparecer
-    local hide_script="$REAL_HOME/.local/bin/tchesco-hide-toolbox.sh"
-    cat > "$hide_script" << 'EOF'
-#!/bin/bash
-# Daemon que esconde o Plasma Toolbox (48x48 DOCK) via XUnmapWindow.
-export DISPLAY=:0
-sleep 8
+# Plasma 6 cria auto um Panel vazio na location=4 (bottom) mesmo quando só definimos
+# o top panel no appletsrc. Esse panel residual renderiza o ToolBoxButton "Add Widgets"
+# sobre o Plank. Removemos todo Containment location=4 sem applets configurados.
+cleanup_residual_panels() {
+    step "Removendo painéis residuais do Plasma (evita 'Add Widgets' fantasma sobre o Plank)"
 
-UNMAP="$HOME/.local/bin/tchesco-unmap"
-while true; do
-    xwininfo -root -tree 2>/dev/null | awk '/48x48\+[0-9]+\+1[0-9]+/ {print $1}' | \
-    while IFS= read -r wid; do
-        state=$(xwininfo -id "$wid" 2>/dev/null | grep "Map State" | awk '{print $NF}')
-        if [[ "$state" == "IsViewable" ]]; then
-            "$UNMAP" "$wid" 2>/dev/null
-        fi
-    done
+    as_user systemctl --user stop plasma-plasmashell.service 2>/dev/null || true
+    pkill -9 plasmashell 2>/dev/null || true
     sleep 2
-done
-EOF
-    chmod +x "$hide_script"
-    chown "$REAL_USER:$REAL_USER" "$hide_script"
 
-    cat > "$autostart_dir/tchesco-hide-toolbox.desktop" << EOF
-[Desktop Entry]
-Type=Application
-Name=Tchesco Hide Toolbox
-Exec=$hide_script
-Hidden=false
-NoDisplay=true
-X-GNOME-Autostart-enabled=true
-X-KDE-autostart-after=panel
-EOF
-    chown "$REAL_USER:$REAL_USER" "$autostart_dir/tchesco-hide-toolbox.desktop"
+    REAL_HOME="$REAL_HOME" python3 << 'PYEOF'
+import os, re
+home = os.environ["REAL_HOME"]
+files = [
+    f"{home}/.config/plasmashellrc",
+    f"{home}/.config/plasma-org.kde.plasma.desktop-appletsrc",
+]
+# Qualquer Containment ou Panel com id != 1,29 (nossos) é residual (52=desktop auto, 55=panel auto)
+KEEP_IDS = {"1", "29"}
+for f in files:
+    if not os.path.exists(f):
+        continue
+    with open(f) as h:
+        content = h.read()
+    # Split em seções por [Header]
+    blocks = re.split(r'(?=^\[)', content, flags=re.MULTILINE)
+    out = []
+    for b in blocks:
+        m = re.match(r'^\[(Containments|PlasmaViews)\](?:\[Panel )?\[?(\d+)\]?', b)
+        if m and m.group(2) not in KEEP_IDS:
+            continue
+        out.append(b)
+    with open(f, "w") as h:
+        h.write("".join(out))
+print("Containments/Panels residuais removidos")
+PYEOF
 
-    ok "Plank configurado: 8 apps + autohide + zoom + hide-toolbox (XUnmap)"
+    chown "$REAL_USER:$REAL_USER" "$REAL_HOME/.config/plasmashellrc" \
+                                  "$REAL_HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
+
+    # Reinicia plasmashell em background como usuário real
+    as_user bash -c 'export DISPLAY=:0; nohup plasmashell --replace > /dev/null 2>&1 & disown' || true
+    sleep 3
+
+    ok "Painéis residuais removidos e plasmashell reiniciado"
 }
 
 configure_sddm() {
@@ -1001,6 +985,7 @@ main() {
     switch_sddm_to_x11
     configure_top_panel
     configure_plank_dock
+    cleanup_residual_panels
     cleanup
     print_summary
 }
