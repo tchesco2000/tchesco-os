@@ -10,9 +10,9 @@ set -euo pipefail
 # ─── Constantes ───────────────────────────────────────────────────────────────
 
 LOG_FILE="/var/log/tchesco-install.log"
-# BUILD_DIR fica no home do usuário real para que os clones sejam de sua propriedade
-# e o install.sh possa escrever nos arquivos sem precisar de chown posterior
 BUILD_DIR=""  # definido em get_real_user() após identificar REAL_HOME
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 WHITESUR_GTK="https://github.com/vinceliuice/WhiteSur-gtk-theme.git"
 WHITESUR_KDE="https://github.com/vinceliuice/WhiteSur-kde.git"
@@ -298,54 +298,137 @@ EOF
     ok "Configurações KDE aplicadas"
 }
 
+install_tchesco_icon() {
+    step "Instalando ícone Tchesco OS"
+
+    local icon_src="$REPO_DIR/tchesco-logo-pack/tchesco-os/assets/logo/tchesco-icon.svg"
+
+    if [[ ! -f "$icon_src" ]]; then
+        warn "Ícone não encontrado em $icon_src — pulando"
+        log "tchesco-icon.svg ausente: $icon_src"
+        return 0
+    fi
+
+    local dest_user="$REAL_HOME/.local/share/icons/hicolor/scalable/apps"
+    as_user mkdir -p "$dest_user"
+    as_user cp "$icon_src" "$dest_user/tchesco.svg"
+
+    mkdir -p /usr/share/pixmaps
+    cp "$icon_src" /usr/share/pixmaps/tchesco.svg
+
+    command -v gtk-update-icon-cache &>/dev/null && \
+        as_user gtk-update-icon-cache -qf "$REAL_HOME/.local/share/icons/hicolor" 2>/dev/null || true
+
+    ok "Ícone Tchesco instalado"
+}
+
+configure_top_panel() {
+    step "Configurando barra superior estilo macOS"
+
+    local icon_path="$REAL_HOME/.local/share/icons/hicolor/scalable/apps/tchesco.svg"
+    local script_path="$REAL_HOME/.local/bin/tchesco-panel-setup.sh"
+    local flag_path="$REAL_HOME/.tchesco-panel-done"
+    local autostart_path="$REAL_HOME/.config/autostart/tchesco-panel-setup.desktop"
+
+    as_user mkdir -p "$REAL_HOME/.local/bin"
+
+    # Escreve o script com heredoc literal e injeta os paths via sed
+    cat > "$script_path" << 'PANEL_EOF'
+#!/bin/bash
+# Configura painel macOS estilo Tchesco OS — executa uma vez no login
+FLAG="__FLAG_PATH__"
+[[ -f "$FLAG" ]] && exit 0
+
+# Aguarda o Plasma carregar (máximo 60s)
+for i in $(seq 1 30); do
+    qdbus org.kde.plasmashell /PlasmaShell 2>/dev/null && break
+    sleep 2
+done
+
+qdbus org.kde.plasmashell /PlasmaShell evaluateScript "
+// Remove painel inferior padrão do Kubuntu (substitui pelo Plank)
+panels().forEach(function(p) {
+    if (p.location === 'bottom') p.remove()
+})
+
+// Cria barra superior estilo macOS
+var panel = new Panel
+panel.location = 'top'
+panel.height = 28
+panel.hiding = 'none'
+
+// Botão do sistema com ícone Tchesco (substitui a maçã do macOS)
+var launcher = panel.addWidget('org.kde.plasma.kickoff')
+launcher.currentConfigGroup = ['General']
+launcher.writeConfig('icon', '__ICON_PATH__')
+
+// Global Menu — menus da app ativa aparecem na barra superior
+panel.addWidget('org.kde.plasma.appmenu')
+
+// Espaçador central empurra relógio e bandeja para a direita
+panel.addWidget('org.kde.plasma.panelspacer')
+
+// Bandeja do sistema (Wi-Fi, volume, bateria)
+panel.addWidget('org.kde.plasma.systemtray')
+
+// Relógio
+panel.addWidget('org.kde.plasma.digitalclock')
+" 2>/dev/null
+
+touch "$FLAG"
+PANEL_EOF
+
+    sed -i "s|__FLAG_PATH__|$flag_path|g" "$script_path"
+    sed -i "s|__ICON_PATH__|$icon_path|g" "$script_path"
+    chmod +x "$script_path"
+    chown "$REAL_USER:$REAL_USER" "$script_path"
+
+    cat > "$autostart_path" << EOF
+[Desktop Entry]
+Type=Application
+Name=Tchesco Panel Setup
+Exec=$script_path
+Hidden=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+EOF
+    chown "$REAL_USER:$REAL_USER" "$autostart_path"
+
+    ok "Barra superior configurada — será criada no próximo login"
+}
+
 configure_plank() {
     step "Configurando Plank Dock"
 
     local plank_dir="$REAL_HOME/.config/plank/dock1"
-    mkdir -p "$plank_dir/launchers"
-    chown -R "$REAL_USER:$REAL_USER" "$REAL_HOME/.config/plank"
+    local launchers_dir="$plank_dir/launchers"
+    as_user mkdir -p "$launchers_dir"
 
-    # Configuração do Plank: dock na base, tema transparente, ícones 48px
+    # Dock centralizado, flutuante (gap 8px), ícones 52px, zoom no hover
     cat > "$plank_dir/settings" << 'EOF'
 [PlankDockPreferences]
-#Whether to show only windows of the current workspace.
 CurrentWorkspaceOnly=false
-#The size of dock icons (in pixels).
-IconSize=48
-#If true, the dock will lock its items in place and not show an 'eject' button for removable devices.
+IconSize=52
 LockItems=false
-#The monitor plug name to display the dock on, or blank to use the primary monitor.
 Monitor=
-#The filename of the theme to use for the dock.
 Theme=Transparent
-#The position for the dock on the monitor.
 Position=3
-#Whether to show 'keep in dock' in the right-click menu.
 ShowDockItem=false
-#The number of seconds to delay before hiding the dock.
 HideDelay=0
-#The type of hiding to use for the dock.
-HideMode=1
-#The number of seconds to wait before unhiding the dock.
+HideMode=0
 UnhideDelay=0
-#The alignment mode for the launchers on the dock.
 Alignment=3
-#The visual offset from the alignment point.
 Offset=0
-#If true, zoom dock items on hover.
 ZoomEnabled=true
-#The maximum zoom percent for the dock items.
 ZoomPercent=150
-#The number of pixels from the screen edge the dock will sit at.
-GapSize=4
+GapSize=8
 EOF
-
     chown "$REAL_USER:$REAL_USER" "$plank_dir/settings"
 
     # Tema WhiteSur para Plank (vem no repo GTK)
     local plank_theme_src="$BUILD_DIR/whitesur-gtk/src/other/plank"
     if [[ -d "$plank_theme_src" ]]; then
-        mkdir -p "$REAL_HOME/.local/share/plank/themes"
+        as_user mkdir -p "$REAL_HOME/.local/share/plank/themes"
         cp -r "$plank_theme_src"/* "$REAL_HOME/.local/share/plank/themes/" 2>/dev/null || true
         chown -R "$REAL_USER:$REAL_USER" "$REAL_HOME/.local/share/plank"
         ok "Tema WhiteSur aplicado ao Plank"
@@ -353,23 +436,41 @@ EOF
         warn "Tema Plank não encontrado — usando Transparent"
     fi
 
-    # Autostart do Plank na sessão KDE
+    # Launchers padrão — apps disponíveis no Kubuntu 26.04
+    local -A dock_items=(
+        ["dolphin"]="org.kde.dolphin.desktop"
+        ["konsole"]="org.kde.konsole.desktop"
+        ["settings"]="systemsettings.desktop"
+        ["kate"]="org.kde.kate.desktop"
+    )
+
+    for name in dolphin konsole settings kate; do
+        local desktop="${dock_items[$name]}"
+        if [[ -f "/usr/share/applications/$desktop" ]]; then
+            cat > "$launchers_dir/${name}.dockitem" << EOF
+[PlankDockItemPreferences]
+Launcher=file:///usr/share/applications/$desktop
+EOF
+            chown "$REAL_USER:$REAL_USER" "$launchers_dir/${name}.dockitem"
+        fi
+    done
+
+    # Autostart do Plank
     local autostart_dir="$REAL_HOME/.config/autostart"
     mkdir -p "$autostart_dir"
     cat > "$autostart_dir/plank.desktop" << 'EOF'
 [Desktop Entry]
 Type=Application
 Name=Plank
-Comment=Dock estilo macOS
 Exec=plank
 Icon=plank
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
 EOF
+    chown "$REAL_USER:$REAL_USER" "$autostart_dir/plank.desktop"
 
-    chown -R "$REAL_USER:$REAL_USER" "$autostart_dir/plank.desktop"
-    ok "Plank configurado e adicionado ao autostart"
+    ok "Plank configurado: centralizado, flutuante, com launchers"
 }
 
 # ─── Limpeza ──────────────────────────────────────────────────────────────────
@@ -390,11 +491,12 @@ print_summary() {
     echo -e "  ${BOLD}Tema KDE:${NC}     WhiteSur"
     echo -e "  ${BOLD}Ícones:${NC}       WhiteSur"
     echo -e "  ${BOLD}Cursores:${NC}     WhiteSur-cursors"
-    echo -e "  ${BOLD}Dock:${NC}         Plank (autostart configurado)"
+    echo -e "  ${BOLD}Dock:${NC}         Plank — centralizado, flutuante, 4 apps"
+    echo -e "  ${BOLD}Barra top:${NC}    Estilo macOS — será criada no próximo login"
+    echo -e "  ${BOLD}Ícone menu:${NC}   Logo Tchesco OS (substituiu a maçã)"
     echo -e "  ${BOLD}Widget style:${NC} Kvantum"
     echo ""
-    echo -e "  ${YELLOW}Reinicie a sessão KDE para ver todas as mudanças.${NC}"
-    echo -e "  ${YELLOW}Ajustes finos podem ser feitos em: Configurações do Sistema${NC}"
+    echo -e "  ${YELLOW}Faça logout e login novamente para ver todas as mudanças.${NC}"
     echo ""
     log "Módulo 02-theme finalizado com sucesso"
 }
@@ -418,7 +520,9 @@ main() {
     install_icons
     install_cursors
     install_plymouth
+    install_tchesco_icon
     apply_kde_config
+    configure_top_panel
     configure_plank
     cleanup
     print_summary
