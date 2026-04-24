@@ -305,27 +305,35 @@ EOF
 }
 
 install_tchesco_icon() {
-    step "Instalando ícone Tchesco OS"
+    step "Instalando ícones Tchesco OS"
 
-    local icon_src="$REPO_DIR/tchesco-logo-pack/tchesco-os/assets/logo/tchesco-icon.svg"
+    local logo_dir="$REPO_DIR/tchesco-logo-pack/tchesco-os/assets/logo"
+    local icon_src="$logo_dir/tchesco-icon.svg"
+    local horizontal_src="$logo_dir/tchesco-logo-horizontal.svg"
 
     if [[ ! -f "$icon_src" ]]; then
         warn "Ícone não encontrado em $icon_src — pulando"
-        log "tchesco-icon.svg ausente: $icon_src"
         return 0
     fi
 
     local dest_user="$REAL_HOME/.local/share/icons/hicolor/scalable/apps"
     as_user mkdir -p "$dest_user"
-    as_user cp "$icon_src" "$dest_user/tchesco.svg"
 
-    mkdir -p /usr/share/pixmaps
+    # Ícone quadrado (T) — usado internamente
+    as_user cp "$icon_src" "$dest_user/tchesco.svg"
     cp "$icon_src" /usr/share/pixmaps/tchesco.svg
+
+    # Logo horizontal — usado no botão do Kickoff na barra superior
+    if [[ -f "$horizontal_src" ]]; then
+        as_user cp "$horizontal_src" "$dest_user/tchesco-horizontal.svg"
+        cp "$horizontal_src" /usr/share/pixmaps/tchesco-horizontal.svg
+        ok "Logo horizontal instalado: tchesco-horizontal"
+    fi
 
     command -v gtk-update-icon-cache &>/dev/null && \
         as_user gtk-update-icon-cache -qf "$REAL_HOME/.local/share/icons/hicolor" 2>/dev/null || true
 
-    ok "Ícone Tchesco instalado"
+    ok "Ícones Tchesco instalados"
 }
 
 configure_top_panel() {
@@ -376,14 +384,20 @@ top.location = 'top'
 top.height = 28
 top.hiding = 'none'
 
-// Logo Tchesco no lugar da maçã (usa nome do ícone instalado no tema)
+// Logo horizontal Tchesco no lugar da maçã (maior e com o nome da distro)
 var launcher = top.addWidget('org.kde.plasma.kickoff')
 launcher.currentConfigGroup = ['General']
-launcher.writeConfig('icon', 'tchesco')
+launcher.writeConfig('icon', 'tchesco-horizontal')
 
 // Global Menu: menus da app ativa aparecem na barra, igual ao macOS
 top.addWidget('org.kde.plasma.appmenu')
 top.addWidget('org.kde.plasma.panelspacer')
+
+// Lupa estilo Spotlight do macOS (Application Dashboard com busca)
+var search = top.addWidget('org.kde.plasma.kickerdash')
+search.currentConfigGroup = ['General']
+search.writeConfig('icon', 'search')
+
 top.addWidget('org.kde.plasma.systemtray')
 top.addWidget('org.kde.plasma.digitalclock')
 
