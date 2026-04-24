@@ -624,6 +624,21 @@ configure_top_panel() {
 
     as_user mkdir -p "$REAL_HOME/.config"
 
+    # Detecta o Activity ID atual (DBus) ANTES de matar plasmashell.
+    # Sem essa chave preenchida corretamente no Containment do desktop, o Plasma
+    # ignora nossa config e cria outro Containment auto (com ID aleatório),
+    # re-introduzindo o botão "Add Widgets" sobre o Plank.
+    local activity_id
+    activity_id=$(as_user bash -c 'DISPLAY=:0 qdbus6 org.kde.ActivityManager /ActivityManager/Activities CurrentActivity 2>/dev/null' || true)
+    [[ -z "$activity_id" ]] && activity_id=$(cat /proc/sys/kernel/random/uuid)
+    log "Activity ID: $activity_id"
+
+    # Mata plasmashell durante a escrita — plasmashell em execução pode sobrescrever
+    # o appletsrc ao sair, perdendo nossa config. cleanup_residual_panels() reinicia.
+    as_user systemctl --user stop plasma-plasmashell.service 2>/dev/null || true
+    pkill -9 plasmashell 2>/dev/null || true
+    sleep 2
+
     # plasmashellrc: dimensões e flags do painel top
     # (dock inferior é o Plank — ver configure_plank_dock)
     cat > "$plasmashellrc" << 'EOF'
@@ -636,8 +651,8 @@ EOF
     chown "$REAL_USER:$REAL_USER" "$plasmashellrc"
 
     # appletsrc: containments (painéis) e applets (widgets).
+    # Containment 1: desktop — plugin=org.kde.plasma.folder, activityId preenchido
     # Panel 29 (top): kickoff[tchesco] → appmenu → spacer → kickerdash[search] → systemtray → clock
-    # Panel 50 (bottom): icontasks com 4 launchers centralizado (alignment=132, lengthMode=2)
     cat > "$appletsrc" << EOF
 [ActionPlugins][0]
 MiddleButton;NoModifier=org.kde.paste
@@ -645,9 +660,9 @@ RightButton;NoModifier=org.kde.contextmenu
 wheel:Vertical;NoModifier=org.kde.switchdesktop
 
 [Containments][1]
-activityId=
+activityId=${activity_id}
 formfactor=0
-immutability=2
+immutability=1
 lastScreen=0
 location=0
 plugin=org.kde.plasma.folder
@@ -657,7 +672,7 @@ wallpaperplugin=org.kde.image
 visibility=none
 
 [Containments][1][Wallpaper][org.kde.image][General]
-Image=file:///usr/share/wallpapers/Next/contents/images/5120x2880.png
+Image=file://${REAL_HOME}/.local/share/wallpapers/WhiteSur-dark/contents/images/3840x2160.jpg
 
 [Containments][29]
 formfactor=2
@@ -710,10 +725,6 @@ EOF
 
     # Desabilita override automático de tema do Kubuntu
     as_user kwriteconfig6 --file kdeglobals --group KDE --key AutomaticLookAndFeel false
-
-    # Trava widgets do desktop — some o botão "Add Widgets" que aparecia na borda inferior
-    as_user kwriteconfig6 --file plasma-org.kde.plasma.desktop-appletsrc \
-        --group Containments --group 1 --key immutability 1
 
     ok "Painel superior configurado (44px) — dock Plank via configure_plank_dock()"
 }
