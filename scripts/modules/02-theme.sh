@@ -351,21 +351,22 @@ configure_top_panel() {
 FLAG="__FLAG_PATH__"
 [[ -f "$FLAG" ]] && exit 0
 
+# Ubuntu 26.04 usa qdbus6 (não qdbus)
+QDBUS="qdbus6"
+
 # Aguarda Plasma carregar completamente (máximo 60s)
 for i in $(seq 1 30); do
-    qdbus org.kde.plasmashell /PlasmaShell 2>/dev/null && break
+    $QDBUS org.kde.plasmashell /PlasmaShell 2>/dev/null && break
     sleep 2
 done
+sleep 2
 
-# 1. Desabilita override de tema automático do Kubuntu
+# Desabilita override de tema automático do Kubuntu
 kwriteconfig6 --file kdeglobals --group KDE --key AutomaticLookAndFeel false
 
-# 2. Aplica tema WhiteSur globalmente
-plasma-apply-lookandfeel --apply com.github.vinceliuice.WhiteSur 2>/dev/null || true
-sleep 3
-
-# 3. Cria painéis via Plasma JS API (funciona em Wayland e X11)
-qdbus org.kde.plasmashell /PlasmaShell evaluateScript "
+# Cria painéis via Plasma JS API
+# IMPORTANTE: NÃO usar plasma-apply-lookandfeel aqui — reinicia plasmashell e reseta painéis
+$QDBUS org.kde.plasmashell /PlasmaShell evaluateScript "
 // Remove todos os painéis existentes (painel padrão Kubuntu)
 panels().forEach(function(p) { p.remove() })
 
@@ -375,10 +376,10 @@ top.location = 'top'
 top.height = 28
 top.hiding = 'none'
 
-// Logo Tchesco no lugar da maçã
+// Logo Tchesco no lugar da maçã (usa nome do ícone instalado no tema)
 var launcher = top.addWidget('org.kde.plasma.kickoff')
 launcher.currentConfigGroup = ['General']
-launcher.writeConfig('icon', '__ICON_PATH__')
+launcher.writeConfig('icon', 'tchesco')
 
 // Global Menu: menus da app ativa aparecem na barra, igual ao macOS
 top.addWidget('org.kde.plasma.appmenu')
@@ -394,6 +395,7 @@ dock.height = 72
 dock.hiding = 'dodgewindows'
 dock.alignment = 'center'
 dock.lengthMode = 'fit'
+dock.floating = true
 
 // Icon-only Task Manager (igual ao Dock do macOS)
 var tasks = dock.addWidget('org.kde.plasma.icontasks')
