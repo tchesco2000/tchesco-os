@@ -175,12 +175,28 @@ Desenvolvimento em fases incrementais, cada uma validada na VM antes de avançar
 - [x] KDE "Sobre este Sistema" — automático via os-release (mostra Tchesco OS)
 - [x] apt intacto — lsb_release -cs = 'resolute' confirmado
 
-### Fase 10 — Geração da ISO ⏳ PRÓXIMA
+### Fase 10 — Geração da ISO ✅ SCRIPT PRONTO / AGUARDANDO TESTE
 
-- [ ] Cubic: importar ISO Kubuntu 26.04
-- [ ] Aplicar script Tchesco no chroot
-- [ ] Calamares com branding Tchesco
-- [ ] Gerar e testar ISO em VM limpa
+`scripts/build-iso.sh`
+`setup/calamares/branding/tchesco/`
+
+> Abordagem: build automatizado via chroot + xorriso (sem Cubic).
+> ISO do Kubuntu 26.04 disponível em /media/sf_D_DRIVE/Downloads/kubuntu-26.04-desktop-amd64.iso
+
+**Como rodar:**
+```bash
+sudo bash scripts/build-iso.sh \
+  /media/sf_D_DRIVE/Downloads/kubuntu-26.04-desktop-amd64.iso \
+  /media/sf_D_DRIVE/tchesco-os-1.0-amd64.iso \
+  gzip
+```
+
+- [x] Script `build-iso.sh` — extrai ISO, chroot, scripts, repack, xorriso
+- [x] Calamares branding — `branding.desc`, `show.qml`, logo.png, welcome.png
+- [x] Compressão configurável: `gzip` (rápido) ou `xz` (menor)
+- [x] Limpeza automática de espaço (apt cache + workspace)
+- [ ] Teste real de build na VM
+- [ ] Teste de instalação em VM limpa
 
 ### Fase 11 — Distribuição ⏳
 
