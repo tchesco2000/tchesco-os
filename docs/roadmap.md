@@ -2,213 +2,174 @@
 
 ## Visão geral
 
-Desenvolvimento estimado em **25-40 horas** de trabalho efetivo, distribuídas em algumas semanas de fins de semana.
+Desenvolvimento em fases incrementais, cada uma validada na VM antes de avançar.
 
 ## Princípios guia
 
-1. **Make it work, make it right, make it fast** — primeiro funcionar, depois perfeito, depois rápido
-2. **MVP antes de features** — versão mínima viável distribuível antes de qualquer refinamento
+1. **Make it work, make it right, make it fast** — primeiro funcionar, depois perfeito
+2. **MVP antes de features** — versão mínima viável antes de refinamentos
 3. **Testar em VM sempre** — nada vai pra hardware real sem passar em VM
 4. **Documentar enquanto constrói** — docs junto do código, não depois
+5. **Tudo fácil igual macOS** — qualquer decisão de UX segue essa diretriz
+
+---
 
 ## Fases
 
-### Fase 0 — Preparação do ambiente (1-2 horas)
+### Fase 0 — Preparação do ambiente ✅ CONCLUÍDA
 
-Objetivo: ambiente de desenvolvimento pronto.
+- [x] VirtualBox no Windows
+- [x] ISO Kubuntu 26.04 LTS baixada
+- [x] Claude Code no WSL Ubuntu
+- [x] Repositório `tchesco-os` criado no GitHub
+- [x] Estrutura de pastas e primeiro commit
 
-- [ ] Instalar VirtualBox no Windows
-- [ ] Baixar ISO Kubuntu 26.04 LTS
-- [ ] Configurar Claude Code no WSL Ubuntu
-- [ ] Criar repositório `tchesco-os` no GitHub
-- [ ] Clonar repo no WSL
-- [ ] Estrutura inicial de pastas
-- [ ] Primeiro commit: README + docs
+### Fase 1 — VM base funcionando ✅ CONCLUÍDA
 
-### Fase 1 — VM base funcionando (30 min)
+- [x] VM VirtualBox (4GB RAM, 40GB disco, 2 CPUs)
+- [x] Kubuntu 26.04 instalado e bootando
+- [x] KDE Plasma 6.6.4 validado
+- [x] Guest Additions instalados
+- [x] SSH funcionando (192.168.0.24, user: suporte)
 
-Objetivo: Kubuntu limpo rodando em VM.
+### Fase 2 — Script v0.1: fundação ✅ CONCLUÍDA
 
-- [ ] Criar VM no VirtualBox (4GB RAM, 40GB disco, 2 CPUs)
-- [ ] Instalar Kubuntu 26.04 (instalação padrão)
-- [ ] Validar boot e KDE Plasma 6
-- [ ] Instalar Guest Additions
-- [ ] Snapshot "kubuntu-limpo" (ponto de retorno)
+`scripts/modules/01-base.sh`
 
-### Fase 2 — Script v0.1: fundação (2-4 horas)
+- [x] Atualização completa do sistema (`apt upgrade`)
+- [x] PPAs: git-core, neovim
+- [x] Utilitários base: curl, wget, htop, fastfetch, rsync, unzip, etc.
+- [x] Timezone: America/Sao_Paulo
+- [x] Locale: pt_BR.UTF-8
 
-Objetivo: script que prepara o terreno para customização.
+### Fase 3 — Script v0.2: identidade visual ✅ CONCLUÍDA
 
-- [ ] `scripts/modules/01-base.sh`
-  - Atualização completa do sistema
-  - Adicionar PPAs necessários
-  - Instalar utilitários base
-  - Configurar timezone e locale
-- [ ] Testar na VM
-- [ ] Ajustar erros
-- [ ] Commit: "feat: script base v0.1"
+`scripts/modules/02-theme.sh`
 
-### Fase 3 — Script v0.2: identidade visual (3-5 horas)
+> Decisões tomadas durante execução (diferem do plano original):
+> - **X11 em vez de Wayland** — Plank e Global Menu não funcionam em Wayland
+> - **Plank em vez de Latte Dock** — Latte descontinuado no Plasma 6
+> - **Firefox deb em vez de snap** — snap não exporta menus DBus para o Global Menu
 
-Objetivo: KDE com cara de macOS.
+- [x] WhiteSur GTK + KDE theme + ícones + cursores
+- [x] Top panel (44px): kickoff(T) → Global Menu → spacer → busca → bandeja → relógio
+- [x] Dock: Plank centralizado, 8 apps, IntelligentHide, zoom 150%
+- [x] 8 apps fixos: Firefox, Dolphin, Kate, Konsole, VSCode, Spectacle, Settings, Widgets
+- [x] Wallpaper: gradient azul-marinho escuro Tchesco (gerado via PIL)
+- [x] Plymouth: breeze-text (sem referência Apple)
+- [x] SDDM: breeze + logo Tchesco horizontal + fundo `#0e1117`
+- [x] Firefox: deb Mozilla PPA + menus internos via policies.json
+- [x] Session: plasmax11 (X11 obrigatório, Wayland oculto)
+- [x] Global Menu: appmenu-gtk-module via /etc/profile.d/ + plasma-workspace/env/
+- [x] `cleanup_residual_panels()`: remove Containments auto que o Plasma cria (fix "Add Widgets")
 
-- [ ] `scripts/modules/02-theme.sh`
-  - Clonar e instalar WhiteSur GTK theme
-  - Instalar WhiteSur KDE theme
-  - Instalar WhiteSur icons
-  - Instalar WhiteSur cursors
-  - Configurar painel superior (menu global)
-  - Instalar e configurar Latte Dock
-  - Aplicar wallpaper Tchesco OS
-  - Configurar Plymouth (boot splash)
-- [ ] Testar troca de tema
-- [ ] Validar em idiomas diferentes
-- [ ] Commit: "feat: tema macOS aplicado"
+### Fase 3.5 — Internacionalização ✅ CONCLUÍDA
 
-### Fase 3.5 — Internacionalização (2-3 horas)
+`scripts/modules/02b-i18n.sh`
 
-Objetivo: sistema multi-idioma completo.
+- [x] 11 language-packs (pt-BR, en, es, fr, de, it, zh, ja, ko, ru, ar)
+- [x] Noto Fonts completo (inclui CJK, Arabic, Hebrew)
+- [x] fcitx5 + mozc (japonês) + chinese-addons (chinês) + hangul (coreano)
+- [x] Hunspell: pt-BR, en-US, es, fr, de
+- [x] Locale padrão: pt_BR.UTF-8
 
-- [ ] `scripts/modules/02b-i18n.sh`
-  - Instalar todos os `language-pack-*`
-  - Instalar Noto Fonts completo
-  - Configurar fcitx5 como IM padrão
-  - Habilitar layouts de teclado múltiplos
-  - Configurar `pt_BR.UTF-8` como padrão
-- [ ] Testar trocar idioma para inglês e voltar
-- [ ] Testar input de japonês (fcitx5 + mozc)
-- [ ] Commit: "feat: suporte multi-idioma"
+### Fase 4 — Script v0.3: Pilar Desenvolvimento ✅ CONCLUÍDA
 
-### Fase 4 — Script v0.3: Pilar Desenvolvimento (2-3 horas)
+`scripts/modules/03-dev.sh`
 
-Objetivo: ambiente dev completo.
+- [x] VS Code (repo Microsoft oficial)
+- [x] Git, GitHub CLI (gh), Gitg
+- [x] Docker + Docker Compose v2 (usuário adicionado ao grupo docker)
+- [x] Podman + Distrobox
+- [x] Node.js LTS via nvm
+- [x] Python 3 + pip + venv + dev
+- [x] Rust via rustup
+- [x] Go via apt
+- [x] DBeaver CE (repo oficial)
+- [x] Clientes: PostgreSQL, MySQL, Redis, SQLite
+- [x] Neovim, net-tools, nmap, traceroute, SSH server, Java (default-jdk)
 
-- [ ] `scripts/modules/03-dev.sh`
-  - Instalar VS Code (repo Microsoft)
-  - Git, Git LFS, GitHub CLI
-  - Docker + Docker Compose
-  - Podman + Distrobox
-  - Node.js via nvm
-  - Python com pip e venv
-  - Rust via rustup
-  - Go via apt
-  - DBeaver CE
-  - Clientes PostgreSQL, MySQL, Redis
-- [ ] Testar clonar um repo e rodar
-- [ ] Testar `docker run hello-world`
-- [ ] Commit: "feat: pilar desenvolvimento"
+---
 
-### Fase 5 — Script v0.4: Pilar Jogos (2-3 horas)
+### Fase 5 — Script v0.4: Pilar Jogos ⏳ PRÓXIMA
 
-Objetivo: gaming funcional.
+`scripts/modules/04-gaming.sh`
 
-- [ ] `scripts/modules/04-gaming.sh`
-  - `ubuntu-drivers autoinstall` para GPU
-  - Habilitar i386 (32-bit)
-  - Vulkan drivers (64 e 32 bits)
-  - Steam
-  - Lutris
-  - Heroic (Flatpak)
-  - GameMode + MangoHud + GOverlay
-  - ProtonUp-Qt
-  - CoreCtrl
-- [ ] Testar instalação em VM (driver virtualizado)
-- [ ] Validar que Steam abre
-- [ ] Commit: "feat: pilar jogos"
+- [ ] `dpkg --add-architecture i386` (32-bit)
+- [ ] Drivers GPU: `ubuntu-drivers autoinstall`
+- [ ] Vulkan: `vulkan-tools`, `libvulkan1`, `libvulkan1:i386`
+- [ ] Steam (repo oficial Valve)
+- [ ] Lutris (PPA)
+- [ ] Heroic Games Launcher (Flatpak)
+- [ ] GameMode (`gamemode`, `gamemoded`)
+- [ ] MangoHud (`mangohud`, `mangohud:i386`)
+- [ ] GOverlay (configurador MangoHud/GameMode)
+- [ ] ProtonUp-Qt (Flatpak — gerencia versões Proton-GE)
+- [ ] CoreCtrl (controle de GPU AMD)
+- [ ] Testar: Steam abre + jogo simples instala
 
-### Fase 6 — Script v0.5: Pilar Office (2-3 horas)
+### Fase 6 — Script v0.5: Pilar Office ⏳
 
-Objetivo: produtividade do usuário comum.
+`scripts/modules/05-office.sh`
 
-- [ ] `scripts/modules/05-office.sh`
-  - LibreOffice completo com integração KDE
-  - OnlyOffice (repo oficial)
-  - Firefox + Thunderbird
-  - VLC, MPV
-  - GIMP, Inkscape, Krita
-  - Kdenlive
-  - OBS Studio
-  - Spotify (Flatpak)
-  - Telegram, Discord (Flatpak)
-  - CUPS + SANE + Simple Scan
-  - Timeshift
-- [ ] Testar abrir LibreOffice em PT-BR
-- [ ] Testar imprimir PDF (impressora virtual)
-- [ ] Commit: "feat: pilar office"
+- [ ] LibreOffice completo com integração KDE
+- [ ] OnlyOffice (repo oficial)
+- [ ] VLC, MPV
+- [ ] GIMP, Inkscape, Krita
+- [ ] Kdenlive
+- [ ] OBS Studio
+- [ ] Spotify (Flatpak)
+- [ ] Telegram, Discord (Flatpak)
+- [ ] CUPS + SANE + Simple Scan
+- [ ] Timeshift (backup)
 
-### Fase 7 — Script v0.6: Compatibilidade Windows (2 horas)
+### Fase 7 — Script v0.6: Compatibilidade Windows ⏳
 
-Objetivo: rodar .exe.
+`scripts/modules/06-wine.sh`
 
-- [ ] `scripts/modules/06-wine.sh`
-  - Wine Staging
-  - Winetricks
-  - Bottles (Flatpak)
-  - ProtonUp-Qt
-- [ ] Testar Bottles criando um prefixo
-- [ ] Testar rodar um .exe simples (7-Zip portable, por exemplo)
-- [ ] Commit: "feat: compatibilidade Windows"
+- [ ] Wine Staging (repo WineHQ)
+- [ ] Winetricks
+- [ ] Bottles (Flatpak)
+- [ ] Testar rodar .exe simples
 
-### Fase 8 — Consolidação e testes (4-6 horas)
+### Fase 8 — Consolidação e testes ⏳
 
-Objetivo: script único robusto e testado.
-
-- [ ] Criar `scripts/tchesco-install.sh` que orquestra todos os módulos
-- [ ] Adicionar tratamento de erro em cada módulo
-- [ ] Adicionar logs em `/var/log/tchesco-install.log`
-- [ ] Testar instalação limpa completa na VM
+- [ ] Instalação limpa completa na VM (do zero)
 - [ ] Medir tempo total de instalação
-- [ ] Identificar e corrigir gargalos
-- [ ] Commit: "feat: script único consolidado"
+- [ ] Tratamento de erros em todos os módulos
+- [ ] Logs em `/var/log/tchesco-install.log`
 
-### Fase 9 — Identidade do Tchesco OS (1-2 horas)
+### Fase 9 — Identidade do Tchesco OS ⏳
 
-Objetivo: personalidade visual única.
+- [ ] `/etc/os-release` customizado (NAME="Tchesco OS")
+- [ ] "Sobre o Sistema" mostrando Tchesco OS 1.0
+- [ ] Neofetch/fastfetch com logo ASCII Tchesco
 
-- [ ] Criar logo Tchesco OS (inicialmente via IA, depois refinar)
-- [ ] Wallpaper oficial do Tchesco OS
-- [ ] Boot splash com logo
-- [ ] Arquivo `/etc/os-release` customizado
-- [ ] "Sobre o sistema" mostrando "Tchesco OS 1.0"
-- [ ] Commit: "feat: identidade Tchesco OS"
+### Fase 10 — Geração da ISO ⏳
 
-### Fase 10 — Geração da ISO (3-4 horas)
+- [ ] Cubic: importar ISO Kubuntu 26.04
+- [ ] Aplicar script Tchesco no chroot
+- [ ] Calamares com branding Tchesco
+- [ ] Gerar e testar ISO em VM limpa
 
-Objetivo: `tchesco-os-1.0.iso` distribuível.
+### Fase 11 — Distribuição ⏳
 
-- [ ] Instalar Cubic no Kubuntu
-- [ ] Importar ISO Kubuntu 26.04 no Cubic
-- [ ] Aplicar script Tchesco dentro do chroot
-- [ ] Configurar instalador Calamares com branding Tchesco
-- [ ] Gerar ISO final
-- [ ] Testar ISO em VM completamente limpa
-- [ ] Validar instalação do zero
-- [ ] Commit: "release: Tchesco OS 1.0"
+- [ ] SHA256 da ISO
+- [ ] GitHub Releases
+- [ ] Instruções de instalação
+- [ ] Distribuir para amigos
 
-### Fase 11 — Distribuição (1 hora)
-
-Objetivo: amigos usando.
-
-- [ ] Fazer hash SHA256 da ISO
-- [ ] Upload em servidor (GitHub Releases ou similar)
-- [ ] Documentar instruções de instalação
-- [ ] Distribuir link pros amigos
-- [ ] Colher primeiros feedbacks
+---
 
 ## Backlog pós-v1.0
 
-Ideias pra v1.1 ou v2.0:
-
-- Instalador Calamares com branding completo
-- Suporte a criptografia de disco por padrão
 - Welcome app no primeiro boot
-- Central de atualizações customizada
-- Repositório próprio Tchesco OS
-- Documentação no site
+- Tema escuro variante Tchesco
+- Repositório próprio
+- Site com documentação
 - Versão para Raspberry Pi
 - Migração para base Debian (v2.0)
-- Otimizações de performance (kernel CachyOS, etc.)
-- Tema escuro Tchesco variante
+- Kernel CachyOS para performance
 
 ## Métricas de sucesso
 
@@ -216,4 +177,3 @@ Ideias pra v1.1 ou v2.0:
 - [ ] Instalação completa em menos de 20 minutos
 - [ ] Roda em VMs com 4GB RAM sem travar
 - [ ] Pelo menos 3 amigos instalaram e usam
-- [ ] Zero crash na primeira semana de uso

@@ -6,47 +6,68 @@
 
 Tchesco OS é uma distribuição Linux baseada em Ubuntu 26.04 LTS com visual inspirado no macOS, focada em três pilares:
 
-1. **Desenvolvimento** — ambiente completo para devs
+1. **Desenvolvimento** — ambiente completo para devs (VS Code, Docker, Node, Rust, Go)
 2. **Jogos** — Steam, Proton, Lutris prontos pra usar
 3. **Usuário comum** — office robusto, multimídia, produtividade
 
 ## Status atual
 
-- **Versão:** 1.0 (em desenvolvimento)
+- **Versão:** 1.0-dev (em desenvolvimento ativo)
 - **Data de início:** Abril de 2026
-- **Base:** Ubuntu 26.04 LTS
-- **Kernel:** Linux 7.0
-- **Desktop Environment:** KDE Plasma 6
+- **Base:** Ubuntu 26.04 LTS (Resolute Raccoon)
+- **Desktop:** KDE Plasma 6.6.4 — **X11 (plasmax11)**
 - **Idioma padrão:** Português (Brasil)
+- **VM de teste:** 192.168.0.24 (user: suporte)
 
-## Características principais
+## Fases de desenvolvimento
 
-- Visual macOS (tema WhiteSur/Sequoia)
-- Kernel Linux 7.0 com Rust estável
-- Suporte completo a GPUs NVIDIA, AMD e Intel
-- Wine + Bottles + Proton-GE pré-configurados para rodar .exe
-- Mais de 50 idiomas incluídos por padrão
-- LibreOffice e OnlyOffice pré-instalados
-- Ferramentas de desenvolvimento prontas para uso
+| Fase | Script | Status |
+|---|---|---|
+| Fase 0 | — | ✅ Repo GitHub + estrutura inicial |
+| Fase 1 | — | ✅ VM Kubuntu 26.04 funcionando |
+| Fase 2 | 01-base.sh | ✅ Base Ubuntu, locale, timezone, utilitários |
+| Fase 3 | 02-theme.sh | ✅ Visual macOS: WhiteSur, Plank, splash, SDDM, X11 |
+| Fase 3.5 | 02b-i18n.sh | ✅ 11 idiomas + fcitx5 JP/CN/KR + fontes |
+| Fase 4 | 03-dev.sh | ✅ VS Code, Docker, Node/nvm, Rust, Go, DBeaver |
+| Fase 5 | 04-gaming.sh | ⏳ Steam, Lutris, GameMode, MangoHud, ProtonUp-Qt |
+| Fase 6 | 05-office.sh | ⏳ LibreOffice, OnlyOffice, VLC, GIMP, OBS |
+| Fase 7 | 06-wine.sh | ⏳ Wine Staging, Winetricks, Bottles |
+| Fase 8 | — | ⏳ Testes limpos + consolidação |
+| Fase 9 | — | ⏳ Identidade: /etc/os-release, "Sobre o Sistema" |
+| Fase 10 | — | ⏳ Geração da ISO (Cubic + Calamares) |
+| Fase 11 | — | ⏳ Distribuição pública |
 
-## Roadmap
+## Visual implementado
 
-- **v1.0** (2026) — Base Ubuntu, uso pessoal e distribuição entre amigos
-- **v2.0** (2027+) — Migração para base Debian, distribuição pública
+- **Tema:** WhiteSur GTK + KDE (sem referências Apple)
+- **Dock:** Plank centralizado, 8 apps fixos, IntelligentHide, zoom 150%
+- **Top bar:** Logo T → Global Menu → Busca → Bandeja → Relógio
+- **Boot:** Plymouth breeze-text (sem Apple)
+- **Login:** SDDM breeze com logo Tchesco + fundo escuro `#0e1117`
+- **Wallpaper:** Gradient azul-marinho escuro (Tchesco)
+- **Firefox:** deb oficial Mozilla (não snap) com menus funcionais
+
+## Como instalar (na VM)
+
+```bash
+git clone https://github.com/tchesco2000/tchesco-os.git
+cd tchesco-os
+sudo bash scripts/tchesco-install.sh
+```
 
 ## Documentação
 
-- [Arquitetura do sistema](docs/architecture.md)
+- [Arquitetura e decisões técnicas](docs/architecture.md)
+- [Roadmap detalhado](docs/roadmap.md)
 - [Lista completa de pacotes](docs/packages.md)
-- [Etapas de construção](docs/roadmap.md)
 - [Guia de instalação](docs/installation.md)
-- [Estratégia de multi-idioma](docs/i18n.md)
-- [Configuração do ambiente de desenvolvimento](docs/dev-setup.md)
+- [Internacionalização](docs/i18n.md)
+- [CLAUDE.md](CLAUDE.md) — guia para o assistente de IA
 
 ## Licença
 
-A definir. Provavelmente GPL v3 (compatível com Ubuntu/Debian).
+GPL v3 — compatível com Ubuntu/Debian.
 
 ## Autor
 
-Projeto pessoal iniciado em 2026.
+Projeto pessoal. Iniciado em abril de 2026.
