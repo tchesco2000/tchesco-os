@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Módulo 02 — Tema visual macOS (WhiteSur + Plank)
-# Fase 3 do roadmap: tema GTK, KDE Plasma 6, ícones, cursores, dock e Plymouth
+# Módulo 02 — Tema visual macOS (WhiteSur + dock nativo KDE Plasma 6)
+# Fase 3 do roadmap: tema GTK, KDE Plasma 6, ícones, cursores, painéis e splash
 #
-# NOTA Latte Dock: abandonado, sem suporte para Plasma 6.
-# Alternativa: Plank dock (GTK, leve, estável no Plasma 6).
+# Dock: usa org.kde.plasma.icontasks (nativo KDE, funciona em Wayland).
+# Plank foi descartado — não tem suporte Wayland no Kubuntu 26.04.
 
 set -euo pipefail
 
@@ -100,7 +100,6 @@ install_deps() {
 
     local packages=(
         git
-        plank               # Dock estilo macOS (substituto do Latte no Plasma 6)
         qt6-style-kvantum   # Engine de temas Qt para widgets mais fiéis ao macOS
         sassc               # Compilador SCSS (necessário para WhiteSur GTK)
         libglib2.0-dev-bin  # glib-compile-schemas (WhiteSur GTK)
@@ -520,82 +519,6 @@ EOF
     ok "Painéis configurados — barra top + dock macOS no próximo login"
 }
 
-configure_plank() {
-    step "Configurando Plank Dock"
-
-    local plank_dir="$REAL_HOME/.config/plank/dock1"
-    local launchers_dir="$plank_dir/launchers"
-    as_user mkdir -p "$launchers_dir"
-
-    # Dock centralizado, flutuante (gap 8px), ícones 52px, zoom no hover
-    cat > "$plank_dir/settings" << 'EOF'
-[PlankDockPreferences]
-CurrentWorkspaceOnly=false
-IconSize=52
-LockItems=false
-Monitor=
-Theme=Transparent
-Position=3
-ShowDockItem=false
-HideDelay=0
-HideMode=0
-UnhideDelay=0
-Alignment=3
-Offset=0
-ZoomEnabled=true
-ZoomPercent=150
-GapSize=8
-EOF
-    chown "$REAL_USER:$REAL_USER" "$plank_dir/settings"
-
-    # Tema WhiteSur para Plank (vem no repo GTK)
-    local plank_theme_src="$BUILD_DIR/whitesur-gtk/src/other/plank"
-    if [[ -d "$plank_theme_src" ]]; then
-        as_user mkdir -p "$REAL_HOME/.local/share/plank/themes"
-        cp -r "$plank_theme_src"/* "$REAL_HOME/.local/share/plank/themes/" 2>/dev/null || true
-        chown -R "$REAL_USER:$REAL_USER" "$REAL_HOME/.local/share/plank"
-        ok "Tema WhiteSur aplicado ao Plank"
-    else
-        warn "Tema Plank não encontrado — usando Transparent"
-    fi
-
-    # Launchers padrão — apps disponíveis no Kubuntu 26.04
-    local -A dock_items=(
-        ["dolphin"]="org.kde.dolphin.desktop"
-        ["konsole"]="org.kde.konsole.desktop"
-        ["settings"]="systemsettings.desktop"
-        ["kate"]="org.kde.kate.desktop"
-    )
-
-    for name in dolphin konsole settings kate; do
-        local desktop="${dock_items[$name]}"
-        if [[ -f "/usr/share/applications/$desktop" ]]; then
-            cat > "$launchers_dir/${name}.dockitem" << EOF
-[PlankDockItemPreferences]
-Launcher=file:///usr/share/applications/$desktop
-EOF
-            chown "$REAL_USER:$REAL_USER" "$launchers_dir/${name}.dockitem"
-        fi
-    done
-
-    # Autostart do Plank
-    local autostart_dir="$REAL_HOME/.config/autostart"
-    mkdir -p "$autostart_dir"
-    cat > "$autostart_dir/plank.desktop" << 'EOF'
-[Desktop Entry]
-Type=Application
-Name=Plank
-Exec=plank
-Icon=plank
-Hidden=false
-NoDisplay=false
-X-GNOME-Autostart-enabled=true
-EOF
-    chown "$REAL_USER:$REAL_USER" "$autostart_dir/plank.desktop"
-
-    ok "Plank configurado: centralizado, flutuante, com launchers"
-}
-
 configure_sddm() {
     step "Configurando tela de login SDDM (Tchesco OS)"
 
@@ -668,7 +591,7 @@ print_summary() {
     echo -e "  ${BOLD}Tema KDE:${NC}     WhiteSur"
     echo -e "  ${BOLD}Ícones:${NC}       WhiteSur"
     echo -e "  ${BOLD}Cursores:${NC}     WhiteSur-cursors"
-    echo -e "  ${BOLD}Dock:${NC}         Plank — centralizado, flutuante, 4 apps"
+    echo -e "  ${BOLD}Dock:${NC}         KDE icontasks — centralizado, flutuante, 4 apps"
     echo -e "  ${BOLD}Barra top:${NC}    Estilo macOS — será criada no próximo login"
     echo -e "  ${BOLD}Ícone menu:${NC}   Logo Tchesco OS (substituiu a maçã)"
     echo -e "  ${BOLD}Widget style:${NC} Kvantum"
@@ -702,7 +625,6 @@ main() {
     configure_sddm
     fix_apple_icons
     configure_top_panel
-    configure_plank
     cleanup
     print_summary
 }
