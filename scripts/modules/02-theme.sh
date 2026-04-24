@@ -653,6 +653,9 @@ location=0
 plugin=org.kde.plasma.folder
 wallpaperplugin=org.kde.image
 
+[Containments][1][Wallpaper][org.kde.image][General]
+Image=file:///usr/share/wallpapers/Next/contents/images/5120x2880.png
+
 [Containments][29]
 formfactor=2
 immutability=1
