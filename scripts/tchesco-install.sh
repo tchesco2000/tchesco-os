@@ -143,6 +143,7 @@ main() {
     run_module "$MODULES_DIR/04-gaming.sh"     "Fase 5 — Jogos"
     run_module "$MODULES_DIR/05-office.sh"     "Fase 6 — Office"
     run_module "$MODULES_DIR/06-wine.sh"       "Fase 7 — Wine"
+    run_module "$MODULES_DIR/07-identity.sh"   "Fase 9 — Identidade"
 
     print_summary
 }

@@ -159,13 +159,23 @@ Desenvolvimento em fases incrementais, cada uma validada na VM antes de avançar
 - [x] Tempo total em sistema já instalado: **1m 10s**
 - [x] Logs em `/var/log/tchesco-install.log`
 
-### Fase 9 — Identidade do Tchesco OS ⏳ PRÓXIMA
+### Fase 9 — Identidade do Tchesco OS ✅ CONCLUÍDA
 
-- [ ] `/etc/os-release` customizado (NAME="Tchesco OS")
-- [ ] "Sobre o Sistema" mostrando Tchesco OS 1.0
-- [ ] Neofetch/fastfetch com logo ASCII Tchesco
+`scripts/modules/07-identity.sh`
 
-### Fase 10 — Geração da ISO ⏳
+> Regra crítica aplicada: apenas campos de exibição foram alterados.
+> ID=ubuntu, VERSION_CODENAME=resolute e DISTRIB_CODENAME preservados intactos.
+> Verificação automática de apt integrity ao final do módulo.
+
+- [x] `/etc/os-release` — NAME, PRETTY_NAME, VERSION, HOME_URL atualizados
+- [x] `/etc/lsb-release` — DISTRIB_DESCRIPTION atualizado
+- [x] `/etc/issue` e `/etc/issue.net` — banner Tchesco OS 1.0
+- [x] GRUB — GRUB_DISTRIBUTOR="Tchesco OS" + update-grub
+- [x] fastfetch — logo "T" azul/ciano + config com 20 módulos de info
+- [x] KDE "Sobre este Sistema" — automático via os-release (mostra Tchesco OS)
+- [x] apt intacto — lsb_release -cs = 'resolute' confirmado
+
+### Fase 10 — Geração da ISO ⏳ PRÓXIMA
 
 - [ ] Cubic: importar ISO Kubuntu 26.04
 - [ ] Aplicar script Tchesco no chroot
