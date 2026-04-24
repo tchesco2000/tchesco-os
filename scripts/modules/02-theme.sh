@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# Módulo 02 — Tema visual macOS (WhiteSur + dock nativo KDE Plasma 6)
-# Fase 3 do roadmap: tema GTK, KDE Plasma 6, ícones, cursores, painéis e splash
+# Módulo 02 — Tema visual macOS (WhiteSur + Plank dock em X11)
+# Fase 3 do roadmap: tema GTK, KDE Plasma 6, ícones, cursores, painéis, splash e dock
 #
 # Sessão: X11 (plasmax11) — escolha consciente, não Wayland
-#   Motivo: Plasma 6 Wayland tem bugs com AutoHide do dock e Global Menu de apps GTK.
-#   X11 funciona sem esses problemas e entrega a experiência macOS-like esperada.
+#   Motivo: Plasma 6 Wayland tem bugs com Global Menu de apps GTK (Firefox) e
+#   Plank não funciona em Wayland.
 #
-# Dock: org.kde.plasma.icontasks com panelVisibility=1 (AutoHide + hover-to-show).
+# Barra superior: painel nativo Plasma 6 (T + Global Menu + busca + systray + clock)
+# Dock inferior: Plank (GTK, X11 only) — comportamento macOS real:
+#   centralizado, autohide, zoom no hover, flutuante, transparente.
 
 set -euo pipefail
 
@@ -113,6 +115,8 @@ install_deps() {
         # Sessão X11 (escolha consciente do Tchesco OS — Wayland tem bugs de UX)
         plasma-session-x11
         kwin-x11
+        # Dock estilo macOS (funciona em X11)
+        plank
     )
 
     local to_install=()
@@ -618,28 +622,16 @@ configure_top_panel() {
     local plasmashellrc="$REAL_HOME/.config/plasmashellrc"
     local appletsrc="$REAL_HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
 
-    # Remove Plank do autostart — não funciona em Wayland
-    rm -f "$REAL_HOME/.config/autostart/plank.desktop" 2>/dev/null || true
-
     as_user mkdir -p "$REAL_HOME/.config"
 
-    # plasmashellrc: dimensões e flags dos painéis
-    # Panel 29 = top (44px, sempre visível)
-    # Panel 50 = bottom dock (56px, flutuante, fit content, auto-hide estilo macOS)
+    # plasmashellrc: dimensões e flags do painel top
+    # (dock inferior é o Plank — ver configure_plank_dock)
     cat > "$plasmashellrc" << 'EOF'
 [PlasmaViews][Panel 29]
 floating=1
 
 [PlasmaViews][Panel 29][Defaults]
 thickness=44
-
-[PlasmaViews][Panel 50]
-floating=1
-panelLengthMode=2
-panelVisibility=0
-
-[PlasmaViews][Panel 50][Defaults]
-thickness=56
 EOF
     chown "$REAL_USER:$REAL_USER" "$plasmashellrc"
 
@@ -707,33 +699,81 @@ plugin=org.kde.plasma.digitalclock
 
 [Containments][29][General]
 AppletOrder=30;31;32;33;34;45
-
-[Containments][50]
-alignment=132
-formfactor=2
-immutability=1
-lastScreen=0
-lengthMode=2
-location=4
-plugin=org.kde.panel
-wallpaperplugin=org.kde.image
-
-[Containments][50][Applets][51]
-immutability=1
-plugin=org.kde.plasma.icontasks
-
-[Containments][50][Applets][51][Configuration][General]
-launchers=applications:org.kde.dolphin.desktop,applications:org.kde.konsole.desktop,applications:systemsettings.desktop,applications:org.kde.kate.desktop
-
-[Containments][50][General]
-AppletOrder=51
 EOF
     chown "$REAL_USER:$REAL_USER" "$appletsrc"
 
     # Desabilita override automático de tema do Kubuntu
     as_user kwriteconfig6 --file kdeglobals --group KDE --key AutomaticLookAndFeel false
 
-    ok "Painéis configurados (top 44px + dock 56px centralizado) — efeito no próximo login"
+    ok "Painel superior configurado (44px) — dock Plank via configure_plank_dock()"
+}
+
+configure_plank_dock() {
+    step "Configurando Plank (dock inferior estilo macOS)"
+
+    # Plank substitui o painel do Plasma porque no Plasma 6 o painel auto-hide
+    # centralizado flutuante tem bugs. Plank em X11 entrega exatamente o que queremos.
+
+    local plank_dir="$REAL_HOME/.config/plank/dock1"
+    as_user mkdir -p "$plank_dir/launchers"
+
+    # Configuração do dock: centralizado (Alignment=3 = Center), autohide com hover,
+    # zoom 150%, posição bottom, tema transparente, ícones 48px
+    cat > "$plank_dir/settings" << 'EOF'
+[PlankDockPreferences]
+CurrentWorkspaceOnly=false
+IconSize=48
+LockItems=false
+Monitor=
+Theme=Transparent
+Position=3
+ShowDockItem=false
+HideDelay=0
+HideMode=1
+UnhideDelay=0
+Alignment=3
+Offset=0
+ZoomEnabled=true
+ZoomPercent=150
+PressureReveal=false
+PinnedOnly=false
+AutoPinning=true
+ShowOnClick=true
+TooltipsEnabled=true
+EOF
+
+    # Launchers padrão: Dolphin, Konsole, Configurações, Kate
+    for app in "org.kde.dolphin" "org.kde.konsole" "systemsettings" "org.kde.kate"; do
+        if [[ -f "/usr/share/applications/${app}.desktop" ]]; then
+            local fname="${app//./_}"
+            cat > "$plank_dir/launchers/${fname}.dockitem" << EOF
+[PlankDockItemPreferences]
+Launcher=file:///usr/share/applications/${app}.desktop
+EOF
+        fi
+    done
+
+    chown -R "$REAL_USER:$REAL_USER" "$REAL_HOME/.config/plank"
+
+    # Garante posse do autostart dir antes de criar .desktop
+    local autostart_dir="$REAL_HOME/.config/autostart"
+    as_user mkdir -p "$autostart_dir"
+    chown "$REAL_USER:$REAL_USER" "$autostart_dir"
+
+    cat > "$autostart_dir/plank.desktop" << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=Plank
+Exec=plank
+Icon=plank
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+X-KDE-autostart-after=panel
+EOF
+    chown "$REAL_USER:$REAL_USER" "$autostart_dir/plank.desktop"
+
+    ok "Plank configurado: autostart ativo + 4 apps + autohide + zoom 150% + center"
 }
 
 configure_sddm() {
@@ -848,6 +888,7 @@ main() {
     setup_firefox_global_menu
     switch_sddm_to_x11
     configure_top_panel
+    configure_plank_dock
     cleanup
     print_summary
 }
