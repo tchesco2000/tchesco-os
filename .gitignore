@@ -1,0 +1,7 @@
+*.iso
+*.log
+build/
+dist/
+*.tmp
+.DS_Store
+.claude/

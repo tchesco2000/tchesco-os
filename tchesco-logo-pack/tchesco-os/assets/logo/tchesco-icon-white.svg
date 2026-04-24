@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Tchesco OS - Ícone Monocromático Branco -->
+  <!-- Use sobre fundos coloridos ou escuros -->
+  
+  <rect width="512" height="512" fill="none"/>
+  
+  <!-- Trilhas de circuito -->
+  <g stroke="#FFFFFF" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 80 140 L 140 140 L 160 120 L 200 120"/>
+    <path d="M 312 120 L 352 120 L 372 140 L 432 140"/>
+    <path d="M 80 372 L 140 372 L 160 392 L 220 392"/>
+    <path d="M 292 392 L 352 392 L 372 372 L 432 372"/>
+    <path d="M 256 440 L 256 410"/>
+  </g>
+  
+  <!-- Nós conectores -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="6">
+    <circle cx="68" cy="140" r="10"/>
+    <circle cx="68" cy="140" r="3" fill="#FFFFFF"/>
+    <circle cx="444" cy="140" r="10"/>
+    <circle cx="444" cy="140" r="3" fill="#FFFFFF"/>
+    <circle cx="68" cy="372" r="10"/>
+    <circle cx="68" cy="372" r="3" fill="#FFFFFF"/>
+    <circle cx="444" cy="372" r="10"/>
+    <circle cx="444" cy="372" r="3" fill="#FFFFFF"/>
+    <circle cx="256" cy="452" r="10"/>
+    <circle cx="256" cy="452" r="3" fill="#FFFFFF"/>
+  </g>
+  
+  <!-- Letra T -->
+  <g fill="#FFFFFF">
+    <path d="M 156 160 
+             L 356 160 
+             L 356 210 
+             L 286 210
+             L 286 400
+             L 226 400
+             L 226 210
+             L 156 210 Z"/>
+  </g>
+  
+  <!-- Chips decorativos -->
+  <g fill="#FFFFFF">
+    <rect x="156" y="160" width="15" height="15"/>
+    <rect x="341" y="160" width="15" height="15"/>
+    <rect x="156" y="195" width="15" height="15"/>
+    <rect x="341" y="195" width="15" height="15"/>
+  </g>
+  
+</svg>

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 200" width="800" height="200">
+  <!-- Tchesco OS - Wordmark (apenas tipografia) -->
+  
+  <defs>
+    <linearGradient id="blueGradientW" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00B4FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0077DD;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <rect width="800" height="200" fill="none"/>
+  
+  <!-- Trilha decorativa antes do texto -->
+  <g stroke="#0099FF" stroke-width="3" fill="none" stroke-linecap="round">
+    <path d="M 20 100 L 60 100 L 75 85 L 95 85"/>
+    <circle cx="15" cy="100" r="5"/>
+    <circle cx="15" cy="100" r="1.5" fill="#0099FF"/>
+  </g>
+  
+  <!-- Texto Tchesco -->
+  <text x="110" y="115" 
+        font-family="'Orbitron', 'Rajdhani', sans-serif" 
+        font-weight="700" 
+        font-size="75" 
+        fill="#0099FF"
+        letter-spacing="3">Tchesco</text>
+  
+  <!-- OS em gradiente -->
+  <text x="500" y="115" 
+        font-family="'Orbitron', 'Rajdhani', sans-serif" 
+        font-weight="900" 
+        font-size="75" 
+        fill="url(#blueGradientW)"
+        letter-spacing="8">OS</text>
+  
+  <!-- Trilha decorativa depois do texto -->
+  <g stroke="#0099FF" stroke-width="3" fill="none" stroke-linecap="round">
+    <path d="M 680 100 L 720 100 L 735 115 L 770 115"/>
+    <circle cx="780" cy="115" r="5"/>
+    <circle cx="780" cy="115" r="1.5" fill="#0099FF"/>
+  </g>
+  
+</svg>

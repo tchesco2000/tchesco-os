@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Tchesco OS - Ícone Principal -->
+  <!-- Design: Letra T dentro de circuito tecnológico -->
+  
+  <defs>
+    <linearGradient id="blueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00B4FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0077DD;stop-opacity:1" />
+    </linearGradient>
+    
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Fundo transparente (use sobre preto ou qualquer cor) -->
+  <rect width="512" height="512" fill="none"/>
+  
+  <!-- Trilhas de circuito superiores -->
+  <g stroke="#0099FF" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Trilha superior esquerda -->
+    <path d="M 80 140 L 140 140 L 160 120 L 200 120"/>
+    <!-- Trilha superior direita -->
+    <path d="M 312 120 L 352 120 L 372 140 L 432 140"/>
+    <!-- Trilha inferior esquerda -->
+    <path d="M 80 372 L 140 372 L 160 392 L 220 392"/>
+    <!-- Trilha inferior direita -->
+    <path d="M 292 392 L 352 392 L 372 372 L 432 372"/>
+    <!-- Trilha central inferior -->
+    <path d="M 256 440 L 256 410"/>
+  </g>
+  
+  <!-- Nós conectores (círculos com ponto central) -->
+  <g fill="none" stroke="#0099FF" stroke-width="6">
+    <!-- Nó superior esquerdo -->
+    <circle cx="68" cy="140" r="10"/>
+    <circle cx="68" cy="140" r="3" fill="#0099FF"/>
+    <!-- Nó superior direito -->
+    <circle cx="444" cy="140" r="10"/>
+    <circle cx="444" cy="140" r="3" fill="#0099FF"/>
+    <!-- Nó inferior esquerdo -->
+    <circle cx="68" cy="372" r="10"/>
+    <circle cx="68" cy="372" r="3" fill="#0099FF"/>
+    <!-- Nó inferior direito -->
+    <circle cx="444" cy="372" r="10"/>
+    <circle cx="444" cy="372" r="3" fill="#0099FF"/>
+    <!-- Nó central inferior -->
+    <circle cx="256" cy="452" r="10"/>
+    <circle cx="256" cy="452" r="3" fill="#0099FF"/>
+  </g>
+  
+  <!-- Letra T central - design bold e moderno -->
+  <g fill="url(#blueGradient)" filter="url(#glow)">
+    <!-- Barra horizontal do T -->
+    <path d="M 156 160 
+             L 356 160 
+             L 356 210 
+             L 286 210
+             L 286 400
+             L 226 400
+             L 226 210
+             L 156 210 Z"/>
+  </g>
+  
+  <!-- Detalhes decorativos nos cantos do T (chips) -->
+  <g fill="#0099FF">
+    <rect x="156" y="160" width="15" height="15"/>
+    <rect x="341" y="160" width="15" height="15"/>
+    <rect x="156" y="195" width="15" height="15"/>
+    <rect x="341" y="195" width="15" height="15"/>
+  </g>
+  
+</svg>
