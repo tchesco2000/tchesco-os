@@ -25,9 +25,13 @@ COMPRESSION="${3:-gzip}"   # gzip = rápido (~30min), xz = menor (~90min)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-WORK_DIR="/tmp/tchesco-iso-build"
+# Workspace em loop image no D: (evita limite de espaço da VM)
+LOOP_IMG="/media/sf_D_DRIVE/tchesco-build.img"
+LOOP_MOUNT="/mnt/tchesco-build"
+WORK_DIR="$LOOP_MOUNT"
 ISO_DIR="$WORK_DIR/iso"
 SQUASHFS_DIR="$WORK_DIR/squashfs"
+MOUNT_DIR="$WORK_DIR/mnt"
 LOG_FILE="/var/log/tchesco-build-iso.log"
 START_TIME=$(date +%s)
 
@@ -51,10 +55,10 @@ elapsed_since() {
 check_requirements() {
     step "Verificando requisitos"
 
-    # Espaço livre
-    local free_gb; free_gb=$(df -BG / | awk 'NR==2{print $4}' | tr -d G)
-    info "Espaço livre: ${free_gb}GB (mínimo 12GB)"
-    [[ "$free_gb" -lt 10 ]] && die "Espaço insuficiente: ${free_gb}GB < 10GB"
+    # Espaço livre no D: (workspace ext4 de 25GB vai ser criado lá)
+    local d_free; d_free=$(df -BG /media/sf_D_DRIVE 2>/dev/null | awk 'NR==2{print $4}' | tr -d G || echo 0)
+    info "Espaço livre no D:: ${d_free}GB (mínimo 30GB para workspace + ISO)"
+    [[ "$d_free" -lt 28 ]] && die "Espaço insuficiente no D:: ${d_free}GB"
 
     # ISO
     local iso_size; iso_size=$(du -h "$ORIG_ISO" | cut -f1)
@@ -67,6 +71,32 @@ check_requirements() {
     info "Compressão: $COMPRESSION"
 
     ok "Requisitos OK"
+}
+
+# ─── Workspace (loop image no D:) ────────────────────────────────────────────
+
+setup_workspace() {
+    step "Preparando workspace (loop image 25GB no D:)"
+
+    if mount | grep -q "$LOOP_MOUNT"; then
+        warn "Workspace já montado"; return 0
+    fi
+
+    if [[ ! -f "$LOOP_IMG" ]]; then
+        info "Criando imagem ext4 de 25GB em $LOOP_IMG..."
+        truncate -s 25G "$LOOP_IMG"
+        mkfs.ext4 -F "$LOOP_IMG" >> "$LOG_FILE" 2>&1
+    fi
+
+    mkdir -p "$LOOP_MOUNT"
+    mount -o loop "$LOOP_IMG" "$LOOP_MOUNT" >> "$LOG_FILE" 2>&1
+    ok "Workspace pronto: $LOOP_MOUNT (25GB ext4)"
+}
+
+teardown_workspace() {
+    umount "$LOOP_MOUNT" 2>/dev/null || true
+    rm -f "$LOOP_IMG"
+    log "Workspace removido"
 }
 
 # ─── Ferramentas de build ─────────────────────────────────────────────────────
@@ -95,25 +125,34 @@ install_build_tools() {
 # ─── Extração da ISO ──────────────────────────────────────────────────────────
 
 extract_iso() {
-    step "Extraindo ISO original"
+    step "Preparando ISO original"
 
-    rm -rf "$WORK_DIR"
-    mkdir -p "$ISO_DIR" "$SQUASHFS_DIR"
+    # Se o squashfs já foi extraído, pula (retomada após falha)
+    if [[ -f "$SQUASHFS_DIR/bin/bash" ]]; then
+        warn "Squashfs já extraído — pulando extração"; return 0
+    fi
 
-    info "Extraindo arquivos da ISO (pode demorar)..."
-    xorriso -osirrox on -indev "$ORIG_ISO" -extract / "$ISO_DIR" >> "$LOG_FILE" 2>&1
+    rm -rf "$ISO_DIR" "$SQUASHFS_DIR" "$MOUNT_DIR"
+    mkdir -p "$ISO_DIR" "$SQUASHFS_DIR" "$MOUNT_DIR"
+
+    # Loop-mount da ISO original (sem copiar o squashfs de 3.8GB — economiza espaço)
+    info "Montando ISO original..."
+    mount -o loop,ro "$ORIG_ISO" "$MOUNT_DIR" >> "$LOG_FILE" 2>&1 \
+        || die "Falha ao montar ISO. Verifique se o arquivo não está corrompido."
+
+    local squashfs="$MOUNT_DIR/casper/filesystem.squashfs"
+    [[ -f "$squashfs" ]] || die "filesystem.squashfs não encontrado em $MOUNT_DIR/casper/"
+
+    # Copia apenas os arquivos pequenos da ISO (~500MB: kernels, EFI, grub, etc.)
+    # O squashfs (~3.8GB) é lido direto do mount, sem copiar
+    info "Copiando estrutura da ISO (exceto squashfs)..."
+    rsync -a --exclude="casper/filesystem.squashfs" "$MOUNT_DIR/" "$ISO_DIR/" >> "$LOG_FILE" 2>&1
     chmod -R u+w "$ISO_DIR"
-
-    local squashfs="$ISO_DIR/casper/filesystem.squashfs"
-    [[ -f "$squashfs" ]] || die "filesystem.squashfs não encontrado em $ISO_DIR/casper/"
 
     info "Extraindo filesystem (squashfs → ~6GB, aguarde)..."
     unsquashfs -d "$SQUASHFS_DIR" "$squashfs" >> "$LOG_FILE" 2>&1
 
-    # Remove squashfs original do ISO_DIR (será regenerado)
-    rm -f "$squashfs"
-
-    ok "ISO extraída — $(du -sh "$SQUASHFS_DIR" | cut -f1) descomprimido"
+    ok "ISO pronta — $(du -sh "$SQUASHFS_DIR" | cut -f1) descomprimido"
 }
 
 # ─── Configuração do chroot ───────────────────────────────────────────────────
@@ -121,15 +160,16 @@ extract_iso() {
 setup_chroot() {
     step "Preparando chroot"
 
-    # Bind mounts necessários
-    mount -t proc  proc            "$SQUASHFS_DIR/proc"
-    mount -t sysfs sysfs           "$SQUASHFS_DIR/sys"
-    mount -o bind  /dev            "$SQUASHFS_DIR/dev"
-    mount -o bind  /dev/pts        "$SQUASHFS_DIR/dev/pts"
-    mount -o bind  /run            "$SQUASHFS_DIR/run"
+    # Rede no chroot — ANTES dos bind mounts para evitar conflito com symlink /run
+    rm -f "$SQUASHFS_DIR/etc/resolv.conf"
+    printf "nameserver 8.8.8.8\nnameserver 1.1.1.1\n" > "$SQUASHFS_DIR/etc/resolv.conf"
 
-    # Rede no chroot
-    cp /etc/resolv.conf "$SQUASHFS_DIR/etc/resolv.conf"
+    # Bind mounts (pula se já montados)
+    mount | grep -q "$SQUASHFS_DIR/proc" || mount -t proc  proc   "$SQUASHFS_DIR/proc"
+    mount | grep -q "$SQUASHFS_DIR/sys"  || mount -t sysfs sysfs  "$SQUASHFS_DIR/sys"
+    mount | grep -q "$SQUASHFS_DIR/dev " || mount -o bind  /dev   "$SQUASHFS_DIR/dev"
+    mount | grep -q "$SQUASHFS_DIR/dev/pts" || mount -o bind /dev/pts "$SQUASHFS_DIR/dev/pts"
+    mount | grep -q "$SQUASHFS_DIR/run"  || mount -o bind  /run   "$SQUASHFS_DIR/run"
 
     # Cria usuário live se não existir (Kubuntu usa 'ubuntu')
     if ! chroot "$SQUASHFS_DIR" id ubuntu &>/dev/null 2>&1; then
@@ -150,7 +190,9 @@ teardown_chroot() {
     umount "$SQUASHFS_DIR/dev"      2>/dev/null || true
     umount "$SQUASHFS_DIR/sys"      2>/dev/null || true
     umount "$SQUASHFS_DIR/proc"     2>/dev/null || true
-    log "Chroot desmontado"
+    # Desmonta ISO original
+    umount "$MOUNT_DIR"             2>/dev/null || true
+    log "Chroot e ISO desmontados"
 }
 
 # ─── Execução dos scripts no chroot ──────────────────────────────────────────
@@ -308,29 +350,20 @@ repack_squashfs() {
 generate_iso() {
     step "Gerando ISO final"
 
-    info "Lendo parâmetros de boot da ISO original..."
-    local boot_params
-    boot_params=$(xorriso -indev "$ORIG_ISO" -report_system_area as_mkisofs 2>/dev/null | head -1 || echo "")
+    # Abordagem: parte da ISO original e substitui só os arquivos modificados.
+    # Preserva toda estrutura de boot (EFI, MBR, GRUB) sem precisar reconstruir.
+    info "Gerando ISO a partir da original (preservando boot)..."
 
-    if [[ -z "$boot_params" ]]; then
-        warn "Não foi possível ler parâmetros de boot — usando padrão EFI+BIOS"
-        boot_params="-isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin \
-            -eltorito-boot boot/grub/i386-pc/eltorito.img \
-            -no-emul-boot -boot-load-size 4 -boot-info-table \
-            --grub2-boot-info \
-            -eltorito-alt-boot -e EFI/boot/bootx64.efi -no-emul-boot"
-    fi
-
-    info "Gerando ISO: $(basename "$OUTPUT_ISO")..."
-    # shellcheck disable=SC2086
-    xorriso -as mkisofs \
-        $boot_params \
-        -volid "TCHESCO_OS_1_0" \
-        -volset "Tchesco OS 1.0" \
-        -iso-level 3 \
-        -full-iso9660-filenames \
-        -output "$OUTPUT_ISO" \
-        "$ISO_DIR" \
+    xorriso \
+        -indev  "$ORIG_ISO" \
+        -outdev "$OUTPUT_ISO" \
+        -volid  "TCHESCO_OS_1_0" \
+        -map "$ISO_DIR/casper/filesystem.squashfs"  "/casper/filesystem.squashfs" \
+        -map "$ISO_DIR/casper/filesystem.manifest"  "/casper/filesystem.manifest" \
+        -map "$ISO_DIR/casper/filesystem.size"      "/casper/filesystem.size" \
+        -map "$ISO_DIR/md5sum.txt"                  "/md5sum.txt" \
+        -map "$ISO_DIR/.disk/info"                  "/.disk/info" \
+        -commit -end \
         >> "$LOG_FILE" 2>&1
 
     ok "ISO gerada: $(du -h "$OUTPUT_ISO" | cut -f1)"
@@ -373,6 +406,7 @@ main() {
 
     check_requirements
     install_build_tools
+    setup_workspace
     extract_iso
     setup_chroot
     run_install_scripts
@@ -382,9 +416,9 @@ main() {
     repack_squashfs
     generate_iso
 
-    # Libera espaço do workspace
-    info "Removendo workspace temporário..."
-    rm -rf "$WORK_DIR"
+    # Desmonta e remove loop image
+    info "Removendo workspace..."
+    teardown_workspace
 
     print_summary
 }

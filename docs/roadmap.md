@@ -195,10 +195,12 @@ sudo bash scripts/build-iso.sh \
 - [x] Calamares branding — `branding.desc`, `show.qml`, logo.png, welcome.png
 - [x] Compressão configurável: `gzip` (rápido) ou `xz` (menor)
 - [x] Limpeza automática de espaço (apt cache + workspace)
-- [ ] Teste real de build na VM
+- [x] Build real executado na VM — **ISO gerada: 6.6GB**
+- [x] MD5: `3de804c7068aea6279da0e5fcd2903a1`
+- [x] ISO salva em `D:\tchesco-os-1.0-amd64.iso`
 - [ ] Teste de instalação em VM limpa
 
-### Fase 11 — Distribuição ⏳
+### Fase 11 — Distribuição ⏳ PRÓXIMA
 
 - [ ] SHA256 da ISO
 - [ ] GitHub Releases
