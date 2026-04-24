@@ -275,9 +275,16 @@ apply_kde_config() {
     as_user kwriteconfig6 --file kdeglobals \
         --group KDE --key LookAndFeelPackage "com.github.vinceliuice.WhiteSur"
 
-    # Desativa ksplash do WhiteSur — mostra logo Apple durante login
+    # Substitui logo Apple no splash do WhiteSur pelo ícone Tchesco
+    local kde_icon="$REPO_DIR/tchesco-logo-pack/tchesco-os/assets/logo/tchesco-icon-kde.svg"
+    for variant in WhiteSur WhiteSur-alt WhiteSur-dark; do
+        local splash_logo="$REAL_HOME/.local/share/plasma/look-and-feel/com.github.vinceliuice.$variant/contents/splash/images/logo.svg"
+        [[ -f "$splash_logo" && -f "$kde_icon" ]] && cp "$kde_icon" "$splash_logo"
+    done
+
+    # Mantém o ksplash WhiteSur ativo (agora com logo Tchesco, não Apple)
     as_user kwriteconfig6 --file ksplashrc \
-        --group KSplash --key Theme "None"
+        --group KSplash --key Theme "com.github.vinceliuice.WhiteSur"
 
     # Tema GTK (para apps GTK dentro do KDE)
     mkdir -p "$REAL_HOME/.config/gtk-3.0" "$REAL_HOME/.config/gtk-4.0"
