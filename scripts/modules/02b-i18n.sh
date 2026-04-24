@@ -151,9 +151,10 @@ install_fcitx5() {
         fcitx5-mozc               # Japonês
         fcitx5-chinese-addons     # Chinês (Pinyin, Cangjie, etc)
         fcitx5-hangul             # Coreano
-        fcitx5-gtk                # Integração GTK
-        fcitx5-qt                 # Integração Qt/KDE
-        fcitx5-configtool         # Interface gráfica de configuração
+        fcitx5-frontend-gtk3      # Integração GTK3
+        fcitx5-frontend-gtk4      # Integração GTK4
+        fcitx5-frontend-qt6       # Integração Qt6/KDE
+        kde-config-fcitx5         # Configuração via KDE
     )
 
     local to_install=()
