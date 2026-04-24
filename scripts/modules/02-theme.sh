@@ -634,9 +634,9 @@ floating=1
 thickness=44
 
 [PlasmaViews][Panel 50]
-floating=0
-panelLengthMode=0
-panelVisibility=1
+floating=1
+panelLengthMode=2
+panelVisibility=0
 
 [PlasmaViews][Panel 50][Defaults]
 thickness=56
@@ -709,13 +709,12 @@ plugin=org.kde.plasma.digitalclock
 AppletOrder=30;31;32;33;34;45
 
 [Containments][50]
-activityId=
 alignment=132
 formfactor=2
 immutability=1
 lastScreen=0
+lengthMode=2
 location=4
-panelVisibility=1
 plugin=org.kde.panel
 wallpaperplugin=org.kde.image
 
