@@ -308,7 +308,7 @@ install_tchesco_icon() {
     step "Instalando ícones Tchesco OS"
 
     local logo_dir="$REPO_DIR/tchesco-logo-pack/tchesco-os/assets/logo"
-    local icon_src="$logo_dir/tchesco-icon.svg"
+    local icon_src="$logo_dir/tchesco-icon-kde.svg"
     local horizontal_src="$logo_dir/tchesco-logo-horizontal.svg"
 
     if [[ ! -f "$icon_src" ]]; then
