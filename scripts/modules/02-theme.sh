@@ -815,7 +815,50 @@ X-KDE-autostart-after=panel
 EOF
     chown "$REAL_USER:$REAL_USER" "$autostart_dir/plank.desktop"
 
-    ok "Plank configurado: autostart ativo + 4 apps + autohide + zoom 150% + center"
+    # Script background que esconde o Plasma Toolbox (botão 48x48 "Add Widgets")
+    # O ToolBox é criado pelo plasmashell e não responde a nenhuma config.
+    # Solução: setar opacity=0 via xprop — compositor KWin torna invisível.
+    local hide_script="$REAL_HOME/.local/bin/tchesco-hide-toolbox.sh"
+    as_user mkdir -p "$REAL_HOME/.local/bin"
+
+    cat > "$hide_script" << 'EOF'
+#!/bin/bash
+# Esconde o botão "Add Widgets" 48x48 do Plasma Toolbox — seta opacity=0.
+# Loop contínuo porque a janela pode ser recriada pelo plasmashell.
+export DISPLAY=:0
+sleep 8
+
+while true; do
+    xwininfo -root -tree 2>/dev/null | awk '/48x48\+[0-9]+\+1[0-9]+/ {print $1}' | \
+    while IFS= read -r wid; do
+        cur=$(xprop -id "$wid" _NET_WM_WINDOW_OPACITY 2>/dev/null | grep -oE "= [0-9]+" | awk '{print $2}')
+        if [[ "$cur" != "0" ]]; then
+            xprop -id "$wid" -f _NET_WM_WINDOW_OPACITY 32c -set _NET_WM_WINDOW_OPACITY 0 2>/dev/null
+        fi
+    done
+    sleep 3
+done
+EOF
+    chmod +x "$hide_script"
+    chown "$REAL_USER:$REAL_USER" "$hide_script"
+
+    cat > "$autostart_dir/tchesco-hide-toolbox.desktop" << EOF
+[Desktop Entry]
+Type=Application
+Name=Tchesco Hide Toolbox
+Exec=$hide_script
+Hidden=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+X-KDE-autostart-after=panel
+EOF
+    chown "$REAL_USER:$REAL_USER" "$autostart_dir/tchesco-hide-toolbox.desktop"
+
+    # Garante que xprop/xwininfo estão instalados
+    dpkg -s x11-utils &>/dev/null 2>&1 || \
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq x11-utils >> "$LOG_FILE" 2>&1
+
+    ok "Plank configurado: 8 apps + autohide + zoom + hide-toolbox ativo"
 }
 
 configure_sddm() {
