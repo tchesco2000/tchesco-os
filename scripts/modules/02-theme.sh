@@ -387,10 +387,15 @@ install_tchesco_icon() {
 setup_global_menu() {
     step "Configurando Global Menu (menus da app no topo)"
 
-    # GTK_MODULES faz apps GTK exportarem seus menus via DBus para o appmenu do KDE
+    # GTK_MODULES em /etc/environment (sistema) garante que processos iniciados
+    # pelo Plasma (via .desktop) também recebem a env var — não só sessões systemd-user.
+    if ! grep -q "^GTK_MODULES" /etc/environment 2>/dev/null; then
+        echo "GTK_MODULES=appmenu-gtk-module" >> /etc/environment
+    fi
+
+    # Mantém também em ~/.config/environment.d (sessão Wayland do KDE)
     local env_dir="$REAL_HOME/.config/environment.d"
     as_user mkdir -p "$env_dir"
-
     cat > "$env_dir/appmenu.conf" << 'EOF'
 GTK_MODULES=appmenu-gtk-module
 UBUNTU_MENUPROXY=1
@@ -402,6 +407,76 @@ EOF
         DEBIAN_FRONTEND=noninteractive apt-get install -y -qq appmenu-gtk3-module >> "$LOG_FILE" 2>&1
 
     ok "Global Menu configurado (apps GTK e Qt exportam menus)"
+}
+
+setup_firefox_global_menu() {
+    step "Configurando Firefox para Global Menu"
+
+    # Firefox deb precisa de 2 coisas para exportar menus via DBus:
+    # 1) ui.use_unity_menubar=true (pref interna)
+    # 2) browser.tabs.inTitlebar=0 (barra de título do sistema, não customizada)
+    # Via autoconfig aplica em todos os perfis automaticamente.
+
+    local ff_root="/usr/lib/firefox"
+    [[ ! -d "$ff_root" ]] && { warn "Firefox deb não encontrado — pulando"; return 0; }
+
+    # policies.json (preferences com Status=default permitem usuário mudar depois)
+    mkdir -p "$ff_root/distribution"
+    cat > "$ff_root/distribution/policies.json" << 'EOF'
+{
+  "policies": {
+    "Preferences": {
+      "ui.use_unity_menubar": {
+        "Value": true,
+        "Status": "default"
+      },
+      "browser.tabs.inTitlebar": {
+        "Value": 0,
+        "Status": "default"
+      }
+    }
+  }
+}
+EOF
+
+    # autoconfig (mais forte que policies — aplica antes da UI carregar)
+    cat > "$ff_root/defaults/pref/autoconfig.js" << 'EOF'
+pref("general.config.filename", "tchesco.cfg");
+pref("general.config.obscure_value", 0);
+EOF
+
+    cat > "$ff_root/tchesco.cfg" << 'EOF'
+// Tchesco OS — Firefox config defaults
+defaultPref("ui.use_unity_menubar", true);
+defaultPref("browser.tabs.inTitlebar", 0);
+EOF
+
+    ok "Firefox configurado para mostrar menus no Global Menu"
+}
+
+setup_plymouth() {
+    step "Configurando Plymouth (boot/shutdown splash Tchesco)"
+
+    # kubuntu-logo mostra logo com gradiente roxo/azul que lembra cores Apple.
+    # breeze-text é minimalista, texto centralizado em fundo escuro — combina com identidade Tchesco.
+
+    local breeze_text="/usr/share/plymouth/themes/breeze-text/breeze-text.plymouth"
+    [[ ! -f "$breeze_text" ]] && { warn "breeze-text Plymouth não instalado — pulando"; return 0; }
+
+    # Registra breeze-text no update-alternatives se ainda não estiver
+    if ! update-alternatives --list default.plymouth 2>/dev/null | grep -q breeze-text; then
+        update-alternatives --install /usr/share/plymouth/themes/default.plymouth \
+            default.plymouth "$breeze_text" 100 >> "$LOG_FILE" 2>&1
+    fi
+
+    # Ativa breeze-text como padrão
+    update-alternatives --set default.plymouth "$breeze_text" >> "$LOG_FILE" 2>&1
+
+    # Regenera initramfs para aplicar no próximo boot
+    info "Regenerando initramfs (pode demorar 30-60s)..."
+    update-initramfs -u >> "$LOG_FILE" 2>&1
+
+    ok "Plymouth: breeze-text (sem logo Kubuntu/cores macOS)"
 }
 
 replace_firefox_snap() {
@@ -457,7 +532,8 @@ configure_top_panel() {
     as_user mkdir -p "$REAL_HOME/.config"
 
     # plasmashellrc: dimensões e flags dos painéis
-    # Panel 29 = top (44px), Panel 50 = bottom dock (56px, flutuante, fit content)
+    # Panel 29 = top (44px, sempre visível)
+    # Panel 50 = bottom dock (56px, flutuante, fit content, auto-hide estilo macOS)
     cat > "$plasmashellrc" << 'EOF'
 [PlasmaViews][Panel 29]
 floating=1
@@ -468,7 +544,7 @@ thickness=44
 [PlasmaViews][Panel 50]
 floating=1
 panelLengthMode=1
-panelVisibility=0
+panelVisibility=1
 
 [PlasmaViews][Panel 50][Defaults]
 thickness=56
@@ -508,6 +584,8 @@ plugin=org.kde.plasma.kickoff
 [Containments][29][Applets][30][Configuration][General]
 favoritesPortedToKAstats=true
 icon=${icon_path}
+useCustomButtonImage=true
+customButtonImage=${icon_path}
 
 [Containments][29][Applets][31]
 immutability=1
@@ -671,9 +749,11 @@ main() {
     install_tchesco_icon
     apply_kde_config
     configure_sddm
+    setup_plymouth
     fix_apple_icons
     setup_global_menu
     replace_firefox_snap
+    setup_firefox_global_menu
     configure_top_panel
     cleanup
     print_summary
