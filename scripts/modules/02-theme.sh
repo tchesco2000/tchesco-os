@@ -10,7 +10,9 @@ set -euo pipefail
 # ─── Constantes ───────────────────────────────────────────────────────────────
 
 LOG_FILE="/var/log/tchesco-install.log"
-BUILD_DIR="/tmp/tchesco-theme-build"
+# BUILD_DIR fica no home do usuário real para que os clones sejam de sua propriedade
+# e o install.sh possa escrever nos arquivos sem precisar de chown posterior
+BUILD_DIR=""  # definido em get_real_user() após identificar REAL_HOME
 
 WHITESUR_GTK="https://github.com/vinceliuice/WhiteSur-gtk-theme.git"
 WHITESUR_KDE="https://github.com/vinceliuice/WhiteSur-kde.git"
@@ -70,6 +72,7 @@ get_real_user() {
     [[ -z "$REAL_USER" ]] && die "Não foi possível identificar o usuário real. Execute via sudo."
     REAL_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
     [[ -z "$REAL_HOME" ]] && die "Não foi possível identificar o home do usuário $REAL_USER."
+    BUILD_DIR="$REAL_HOME/tchesco-theme-build"
     log "Usuário real: $REAL_USER ($REAL_HOME)"
 }
 
@@ -125,8 +128,9 @@ install_deps() {
 clone_repos() {
     step "Clonando repositórios WhiteSur"
 
+    # Remove build anterior e recria como usuário real (evita problema de permissão)
     rm -rf "$BUILD_DIR"
-    mkdir -p "$BUILD_DIR"
+    as_user mkdir -p "$BUILD_DIR"
 
     local repos=(
         "whitesur-gtk|$WHITESUR_GTK"
@@ -139,7 +143,7 @@ clone_repos() {
         local name="${entry%%|*}"
         local url="${entry##*|}"
         info "Clonando $name..."
-        git clone --depth=1 -q "$url" "$BUILD_DIR/$name" >> "$LOG_FILE" 2>&1
+        as_user git clone --depth=1 -q "$url" "$BUILD_DIR/$name" >> "$LOG_FILE" 2>&1
         ok "$name clonado"
     done
 }
