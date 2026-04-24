@@ -653,9 +653,6 @@ location=0
 plugin=org.kde.plasma.folder
 wallpaperplugin=org.kde.image
 
-[Containments][1][General]
-ToolBoxButtonState=topleft
-
 [Containments][1][ToolBox]
 visibility=none
 
@@ -758,15 +755,44 @@ ShowOnClick=false
 TooltipsEnabled=true
 EOF
 
-    # Launchers padrão: Dolphin, Konsole, Configurações, Kate
-    for app in "org.kde.dolphin" "org.kde.konsole" "systemsettings" "org.kde.kate"; do
-        if [[ -f "/usr/share/applications/${app}.desktop" ]]; then
-            local fname="${app//./_}"
-            cat > "$plank_dir/launchers/${fname}.dockitem" << EOF
-[PlankDockItemPreferences]
-Launcher=file:///usr/share/applications/${app}.desktop
+    # Cria .desktop customizado "Widgets" — abre seletor de widgets do Plasma
+    # (ideia do usuário: em vez de esconder o toolbox, vira ícone do dock)
+    local user_apps="$REAL_HOME/.local/share/applications"
+    as_user mkdir -p "$user_apps"
+    cat > "$user_apps/tchesco-widgets.desktop" << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=Widgets
+Name[pt_BR]=Widgets
+Comment=Adicionar widgets ao desktop
+Comment[pt_BR]=Adicionar widgets ao desktop
+Icon=plasma
+Exec=qdbus6 org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.toggleWidgetExplorer
+Categories=Utility;
+StartupNotify=false
+Terminal=false
 EOF
-        fi
+    chown "$REAL_USER:$REAL_USER" "$user_apps/tchesco-widgets.desktop"
+
+    # Dock padrão Tchesco OS — 8 apps fixos (ordem preservada por numeração)
+    local -a DOCK_ORDER=(
+        "01:firefox:/usr/share/applications/firefox.desktop"
+        "02:dolphin:/usr/share/applications/org.kde.dolphin.desktop"
+        "03:kate:/usr/share/applications/org.kde.kate.desktop"
+        "04:konsole:/usr/share/applications/org.kde.konsole.desktop"
+        "05:vscode:/usr/share/applications/code.desktop"
+        "06:spectacle:/usr/share/applications/org.kde.spectacle.desktop"
+        "07:settings:/usr/share/applications/systemsettings.desktop"
+        "08:widgets:$user_apps/tchesco-widgets.desktop"
+    )
+
+    for entry in "${DOCK_ORDER[@]}"; do
+        IFS=':' read -r num name path <<< "$entry"
+        [[ -f "$path" ]] || continue
+        cat > "$plank_dir/launchers/${num}_${name}.dockitem" << EOF
+[PlankDockItemPreferences]
+Launcher=file://${path}
+EOF
     done
 
     chown -R "$REAL_USER:$REAL_USER" "$REAL_HOME/.config/plank"
