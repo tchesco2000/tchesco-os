@@ -8,8 +8,8 @@ Tchesco OS é uma distribuição Linux baseada em **Kubuntu 26.04 LTS** com visu
 - **Código local:** `/mnt/d/www/ia_documentacao/tchesco_OS`
 - **VM de teste:** `192.168.0.24` — user: `suporte`, pass: `tchesco` (SSH liberado)
 - **Base:** Ubuntu 26.04 LTS (Resolute Raccoon) + KDE Plasma 6.6.4 + **X11 obrigatório**
-- **ISO atual:** `D:\tchesco-os-1.0-amd64.iso` (6.6GB) — gerada com `tchesco-rebuild-v2.sh`
-- **Versão:** 1.0
+- **ISO atual:** `D:\tchesco-os-1.1-amd64.iso` (6.6GB) — gerada com `tchesco-rebuild-v2.sh` (bugs visuais pendentes)
+- **Versão:** 1.1 (em andamento — visual incompleto no live)
 
 ---
 
@@ -174,6 +174,13 @@ check_root() { [[ $EUID -eq 0 ]] || die "Execute como root: sudo $0"; }
 ### Bug 17 — Menu do live mostra "Install Kubuntu 26.04 (OEM mode)"
 - **Causa:** O arquivo `/usr/share/applications/calamares.desktop` ainda tem o nome "Install Kubuntu" do pacote original.
 - **Fix (v1.1):** No rebuild, fazer `sed -i 's/Install Kubuntu/Instalar Tchesco OS/g'` no arquivo `.desktop` do Calamares dentro do squashfs.
+- **Status:** Fix aplicado no `tchesco-rebuild-v2.sh` (5i) e confirmado no log. ✅
+
+### Bug 18 — Abordagem de rebuild via ISO antiga não reproduz o visual da VM
+- **Causa:** O `tchesco-rebuild-v2.sh` extrai o squashfs da `tchesco-os-1.0-FINAL.iso` (ISO antiga) e tenta aplicar configs do suporte por cima. O ambiente live resultante não é igual ao que foi configurado e validado na VM: dock desaparece, wallpaper errado, serviços KDE com falha.
+- **Raiz do problema:** Copiar arquivos de config de `/home/suporte` para `/home/ubuntu` no squashfs é frágil — paths relativos, serviços que dependem de estado de runtime, Plank que precisa de env vars específicos no autostart.
+- **Fix correto (v1.2):** Capturar o squashfs diretamente da VM ao vivo com `mksquashfs /` excluindo `/proc /sys /dev /tmp /run`. Isso garante que o sistema na ISO é idêntico ao validado na VM. Aplicar só os patches mínimos depois (renomear usuário live, ajustar SDDM, remover plasma-welcome).
+- **NÃO usar:** abordagem atual de copiar configs por cima de ISO antiga.
 
 ---
 
@@ -285,16 +292,38 @@ sshpass -p tchesco ssh suporte@192.168.0.24 \
 
 ---
 
-## Próximos Passos (v1.1)
+## Status dos Fixes v1.1
 
-Pendências identificadas no teste da ISO v1.0:
+Fixes aplicados no `tchesco-rebuild-v2.sh` (etapa `[5/9]`) e na ISO `tchesco-os-1.1-amd64.iso`:
 
-| # | Problema | Fix |
-|---|---|---|
-| 1 | Tela inicial "Try Kubuntu / Install Kubuntu" | Editar `welcome.conf` do Calamares no squashfs |
-| 2 | Botão "Instalar Tchesco OS" não abre Calamares | Usar `pkexec calamares` no `tchesco-welcome` |
-| 3 | Plank não aparece no live | Adicionar `env XDG_SESSION_TYPE=x11` no `plank.desktop` de autostart |
-| 4 | Menu mostra "Install Kubuntu 26.04" | `sed` no `calamares.desktop` dentro do squashfs |
-| 5 | Usuário live ainda é `ubuntu` | Renomear via casper ou criar usuário `tchesco` |
+| # | Problema | Fix | Status |
+|---|---|---|---|
+| 1 | Tela "Try Kubuntu" no Calamares (Bug 14) | `sed` em `welcome.conf` → appName/appVersion | ✅ Aplicado — confirmado no log |
+| 2 | Botão instalar sem ação (Bug 15) | `pkexec calamares` no `tchesco-welcome` | ✅ Aplicado |
+| 3 | Plank sumido no live (Bug 16) | `env XDG_SESSION_TYPE=x11` no `plank.desktop` | ⚠️ Aplicado mas dock ainda some — Bug 18 |
+| 4 | Menu "Install Kubuntu" (Bug 17) | `sed` em `calamares.desktop` | ✅ Aplicado — confirmado no log |
+| 5 | Usuário live ainda é `ubuntu` | Renomear via casper | ⏳ Não implementado |
 
-Todos os 5 fixes vão no `tchesco-rebuild-v2.sh` na etapa `[5/9]`.
+**Problema fundamental (Bug 18):** a abordagem de patching sobre ISO antiga não reproduz o visual validado na VM. O visual (dock, wallpaper, tema) fica incompleto ou diferente do modelo.
+
+## Próximos Passos (v1.2)
+
+**Abordagem correta:** capturar squashfs diretamente da VM que já tem tudo validado.
+
+```bash
+# Na VM (como root):
+mksquashfs / /tmp/tchesco-live.squashfs \
+  -comp gzip -noappend \
+  -e proc sys dev tmp run media mnt \
+     var/log var/cache/apt var/tmp \
+     home/suporte/.cache
+# Copiar para D: e usar como base do rebuild
+```
+
+Depois disso, apenas patches mínimos:
+1. SDDM autologin com usuário `ubuntu` + sessão `plasmax11`
+2. Remover `plasma-welcome`
+3. Ajustar senha live: `ubuntu:tchesco`
+4. `pkexec calamares` no welcome (já corrigido)
+5. GRUB labels (já corrigido)
+6. Branding Calamares (já corrigido)

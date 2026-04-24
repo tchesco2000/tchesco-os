@@ -175,22 +175,17 @@ Desenvolvimento em fases incrementais, cada uma validada na VM antes de avançar
 - [x] KDE "Sobre este Sistema" — automático via os-release (mostra Tchesco OS)
 - [x] apt intacto — lsb_release -cs = 'resolute' confirmado
 
-### Fase 10 — Geração da ISO ✅ CONCLUÍDA
+### Fase 10 — Geração da ISO ⚠️ EM REVISÃO
 
-`scripts/tchesco-rebuild-v2.sh` ← **script definitivo**
+`scripts/tchesco-rebuild-v2.sh` ← script atual (abordagem de patching)
 `setup/calamares/branding/tchesco/`
 `setup/welcome/` — Tchesco Welcome (PyQt6)
 
-> Abordagem: build automatizado via chroot + xorriso (sem Cubic).
-> Workspace 30GB como loop image no D: para evitar limitação de disco da VM.
+> **v1.0** — ISO 6.6GB gerada e bootável. Visual correto.
+> **v1.1** — Fixes aplicados (bugs 14-17), mas visual do live ainda com defeitos (Bug 18).
+> **Problema fundamental:** rebuild extrai squashfs de ISO antiga e cola configs por cima — frágil. Dock some, wallpaper errado, serviços KDE com falha.
 
-**Como rodar:**
-```bash
-sshpass -p tchesco scp -r scripts/ setup/ suporte@192.168.0.24:~/tchesco-os/
-sshpass -p tchesco ssh suporte@192.168.0.24 \
-  "echo tchesco | sudo -S bash ~/tchesco-os/scripts/tchesco-rebuild-v2.sh 2>&1"
-```
-
+**ISO v1.0 (funcional):**
 - [x] Plymouth corrigido no initrd — `breeze-text`, sem logo Apple
 - [x] `plasma-welcome` removido com `apt purge`
 - [x] Configs KDE reais copiadas do suporte para live user
@@ -198,17 +193,25 @@ sshpass -p tchesco ssh suporte@192.168.0.24 \
 - [x] Calamares branding `tchesco`
 - [x] GRUB: "Try or Install Tchesco OS"
 - [x] ISO: **6.6GB**, El Torito ✅, EFI + BIOS ✅
-- [x] Testada no VirtualBox — boot funcional
-- [ ] Teste instalação completa com Calamares em VM limpa
+- [x] Boot funcional no VirtualBox
 
-### Fase 11 — Distribuição ⏳ PRÓXIMA
+**ISO v1.1 (fixes parciais):**
+- [x] `welcome.conf` Calamares → "Tchesco OS 1.0" (Bug 14)
+- [x] Botão instalar → `pkexec calamares` (Bug 15)
+- [x] `plank.desktop` autostart → `env XDG_SESSION_TYPE=x11` (Bug 16 — fix aplicado, dock ainda some por Bug 18)
+- [x] `calamares.desktop` → "Instalar Tchesco OS" (Bug 17)
+- [ ] Visual live idêntico à VM (bloqueado pelo Bug 18)
 
-- [ ] Teste de instalação completa em VM limpa
+**Próximo passo obrigatório (v1.2):** capturar squashfs diretamente da VM com `mksquashfs /` (excluindo `/proc /sys /dev /tmp /run`) e usar como base do rebuild em vez de uma ISO antiga.
+
+### Fase 11 — Distribuição ⏳ AGUARDANDO ISO ESTÁVEL
+
+- [ ] Resolver Bug 18 (squashfs direto da VM) → ISO v1.2 com visual correto
+- [ ] Teste de instalação completa em VM limpa com Calamares
 - [ ] SHA256 da ISO
 - [ ] GitHub Release com ISO anexada
 - [ ] README com instruções de instalação
 - [ ] Distribuir para amigos para teste
-- [ ] Distribuir para amigos
 
 ---
 
