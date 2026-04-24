@@ -384,139 +384,187 @@ install_tchesco_icon() {
     ok "Ícones Tchesco instalados"
 }
 
+setup_global_menu() {
+    step "Configurando Global Menu (menus da app no topo)"
+
+    # GTK_MODULES faz apps GTK exportarem seus menus via DBus para o appmenu do KDE
+    local env_dir="$REAL_HOME/.config/environment.d"
+    as_user mkdir -p "$env_dir"
+
+    cat > "$env_dir/appmenu.conf" << 'EOF'
+GTK_MODULES=appmenu-gtk-module
+UBUNTU_MENUPROXY=1
+EOF
+    chown "$REAL_USER:$REAL_USER" "$env_dir/appmenu.conf"
+
+    # Garante que appmenu-gtk3-module está instalado
+    dpkg -s appmenu-gtk3-module &>/dev/null 2>&1 || \
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq appmenu-gtk3-module >> "$LOG_FILE" 2>&1
+
+    ok "Global Menu configurado (apps GTK e Qt exportam menus)"
+}
+
+replace_firefox_snap() {
+    step "Substituindo Firefox snap pelo deb (Mozilla oficial)"
+
+    # Firefox snap não exporta menus via DBus — sem Global Menu.
+    # Trocamos pelo deb oficial da Mozilla via repositório próprio.
+    if [[ ! -f /var/lib/snapd/snaps/firefox_*.snap ]] && \
+       dpkg -l firefox 2>/dev/null | grep -q "^ii  firefox.*build1"; then
+        warn "Firefox deb já instalado, pulando"
+        return 0
+    fi
+
+    info "Removendo Firefox snap..."
+    snap remove --purge firefox 2>/dev/null || true
+    apt-get purge -y -qq firefox >> "$LOG_FILE" 2>&1 || true
+
+    info "Adicionando repositório Mozilla..."
+    install -d -m 0755 /etc/apt/keyrings
+    wget -qO- https://packages.mozilla.org/apt/repo-signing-key.gpg > \
+        /etc/apt/keyrings/packages.mozilla.org.asc
+
+    echo "deb [signed-by=/etc/apt/keyrings/packages.mozilla.org.asc] https://packages.mozilla.org/apt mozilla main" \
+        > /etc/apt/sources.list.d/mozilla.list
+
+    # Prioridade alta para repo Mozilla vencer o snap stub do Ubuntu
+    cat > /etc/apt/preferences.d/mozilla << 'EOF'
+Package: *
+Pin: origin packages.mozilla.org
+Pin-Priority: 1000
+EOF
+
+    info "Instalando Firefox deb..."
+    apt-get update -qq >> "$LOG_FILE" 2>&1
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq firefox >> "$LOG_FILE" 2>&1
+
+    ok "Firefox deb instalado (com suporte a Global Menu)"
+}
+
 configure_top_panel() {
-    step "Configurando painéis estilo macOS (Wayland-compatible)"
+    step "Configurando painéis estilo macOS (config direta em arquivos)"
+
+    # Abordagem: escrever os arquivos de config do Plasma diretamente.
+    # Mais robusto que qdbus evaluateScript, que perdia configs ao reiniciar.
 
     local icon_path="$REAL_HOME/.local/share/icons/hicolor/scalable/apps/tchesco.svg"
-    local script_path="$REAL_HOME/.local/bin/tchesco-panel-setup.sh"
-    local flag_path="$REAL_HOME/.tchesco-panel-done"
-    local autostart_path="$REAL_HOME/.config/autostart/tchesco-panel-setup.desktop"
+    local plasmashellrc="$REAL_HOME/.config/plasmashellrc"
+    local appletsrc="$REAL_HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
 
-    # Remove Plank do autostart — não funciona em Wayland (Kubuntu 26.04 padrão)
+    # Remove Plank do autostart — não funciona em Wayland
     rm -f "$REAL_HOME/.config/autostart/plank.desktop" 2>/dev/null || true
 
-    as_user mkdir -p "$REAL_HOME/.local/bin"
+    as_user mkdir -p "$REAL_HOME/.config"
 
-    # Reseta flag para o script rodar novamente com a configuração atualizada
-    rm -f "$flag_path" 2>/dev/null || true
+    # plasmashellrc: dimensões e flags dos painéis
+    # Panel 29 = top (44px), Panel 50 = bottom dock (56px, flutuante, fit content)
+    cat > "$plasmashellrc" << 'EOF'
+[PlasmaViews][Panel 29]
+floating=1
 
-    # Escreve script com heredoc literal (sem expansão) + sed injeta os paths
-    cat > "$script_path" << 'PANEL_EOF'
-#!/bin/bash
-# Configura painéis macOS estilo Tchesco OS — executa uma vez após instalação.
-# Se precisar reaplicar, delete ~/.tchesco-panel-done e faça logout/login.
-FLAG="__FLAG_PATH__"
-[[ -f "$FLAG" ]] && exit 0
+[PlasmaViews][Panel 29][Defaults]
+thickness=44
 
-QDBUS="qdbus6"
+[PlasmaViews][Panel 50]
+floating=1
+panelLengthMode=1
+panelVisibility=0
 
-# ── FASE 1: Aguarda Plasma subir (após login inicial) ──────────────
-# O systemd não herda DBUS_SESSION_BUS_ADDRESS — obtemos do /proc
-for i in $(seq 1 45); do
-    sleep 2
-    PLASMA_PID=$(pgrep -u "$USER" plasmashell 2>/dev/null | head -1)
-    [[ -z "$PLASMA_PID" ]] && continue
-    DBUS_ADDR=$(cat /proc/"$PLASMA_PID"/environ 2>/dev/null \
-        | tr '\0' '\n' | grep DBUS_SESSION_BUS_ADDRESS | cut -d= -f2-)
-    [[ -z "$DBUS_ADDR" ]] && continue
-    export DBUS_SESSION_BUS_ADDRESS="$DBUS_ADDR"
-    break
-done
-
-# ── FASE 2: Reset completo de painéis ──────────────────────────────
-# Previne acumulação de painéis órfãos em re-execuções:
-#   panel.remove() via JS remove do appletsrc, mas deixa [PlasmaViews][Panel N]
-#   lixo no plasmashellrc, causando barras vazias sobrepostas.
-# Solução: matar plasmashell → limpar configs → subir plasmashell do zero.
-kquitapp6 plasmashell 2>/dev/null || true
-sleep 2
-pkill -9 plasmashell 2>/dev/null || true
-sleep 1
-
-rm -f "$HOME/.config/plasmashellrc"
-rm -f "$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
-
-# Desabilita override do Kubuntu ANTES de subir plasmashell
-kwriteconfig6 --file kdeglobals --group KDE --key AutomaticLookAndFeel false
-
-# Sobe plasmashell de novo (config zerada → só o painel padrão Kubuntu)
-nohup plasmashell >/dev/null 2>&1 &
-disown
-
-# Aguarda plasmashell responder ao DBUS com config nova
-for i in $(seq 1 30); do
-    sleep 2
-    PLASMA_PID=$(pgrep -u "$USER" plasmashell 2>/dev/null | head -1)
-    [[ -z "$PLASMA_PID" ]] && continue
-    DBUS_ADDR=$(cat /proc/"$PLASMA_PID"/environ 2>/dev/null \
-        | tr '\0' '\n' | grep DBUS_SESSION_BUS_ADDRESS | cut -d= -f2-)
-    [[ -z "$DBUS_ADDR" ]] && continue
-    export DBUS_SESSION_BUS_ADDRESS="$DBUS_ADDR"
-    TEST=$($QDBUS org.kde.plasmashell /PlasmaShell evaluateScript "panels().length" 2>/dev/null)
-    [[ -n "$TEST" ]] && break
-done
-sleep 3  # margem para o painel padrão Kubuntu aparecer antes de substituir
-
-# ── FASE 3: Cria painéis Tchesco ───────────────────────────────────
-$QDBUS org.kde.plasmashell /PlasmaShell evaluateScript "
-// Remove painel padrão do Kubuntu
-panels().forEach(function(p) { p.remove() })
-
-// Barra superior estilo macOS
-var top = new Panel
-top.location = 'top'
-top.height = 40
-top.hiding = 'none'
-
-var launcher = top.addWidget('org.kde.plasma.kickoff')
-launcher.currentConfigGroup = ['General']
-launcher.writeConfig('icon', '__ICON_PATH__')
-
-top.addWidget('org.kde.plasma.appmenu')
-top.addWidget('org.kde.plasma.panelspacer')
-
-var search = top.addWidget('org.kde.plasma.kickerdash')
-search.currentConfigGroup = ['General']
-search.writeConfig('icon', 'search')
-
-top.addWidget('org.kde.plasma.systemtray')
-top.addWidget('org.kde.plasma.digitalclock')
-
-// Dock centralizado flutuante estilo macOS
-var dock = new Panel
-dock.location = 'bottom'
-dock.height = 72
-dock.hiding = 'dodgewindows'
-dock.alignment = 'center'
-dock.lengthMode = 'fit'
-dock.floating = true
-
-var tasks = dock.addWidget('org.kde.plasma.icontasks')
-tasks.currentConfigGroup = ['General']
-tasks.writeConfig('launchers', 'applications:org.kde.dolphin.desktop,applications:org.kde.konsole.desktop,applications:systemsettings.desktop,applications:org.kde.kate.desktop')
-tasks.writeConfig('iconSpacing', '1')
-" 2>/dev/null
-
-touch "$FLAG"
-PANEL_EOF
-
-    sed -i "s|__FLAG_PATH__|$flag_path|g" "$script_path"
-    sed -i "s|__ICON_PATH__|$icon_path|g" "$script_path"
-    chmod +x "$script_path"
-    chown "$REAL_USER:$REAL_USER" "$script_path"
-
-    cat > "$autostart_path" << EOF
-[Desktop Entry]
-Type=Application
-Name=Tchesco Panel Setup
-Exec=$script_path
-Hidden=false
-NoDisplay=true
-X-GNOME-Autostart-enabled=true
+[PlasmaViews][Panel 50][Defaults]
+thickness=56
 EOF
-    chown "$REAL_USER:$REAL_USER" "$autostart_path"
+    chown "$REAL_USER:$REAL_USER" "$plasmashellrc"
 
-    ok "Painéis configurados — barra top + dock macOS no próximo login"
+    # appletsrc: containments (painéis) e applets (widgets).
+    # Panel 29 (top): kickoff[tchesco] → appmenu → spacer → kickerdash[search] → systemtray → clock
+    # Panel 50 (bottom): icontasks com 4 launchers centralizado (alignment=132, lengthMode=2)
+    cat > "$appletsrc" << EOF
+[ActionPlugins][0]
+MiddleButton;NoModifier=org.kde.paste
+RightButton;NoModifier=org.kde.contextmenu
+wheel:Vertical;NoModifier=org.kde.switchdesktop
+
+[Containments][1]
+activityId=
+formfactor=0
+immutability=1
+lastScreen=0
+location=0
+plugin=org.kde.plasma.folder
+wallpaperplugin=org.kde.image
+
+[Containments][29]
+formfactor=2
+immutability=1
+lastScreen=0
+location=3
+plugin=org.kde.panel
+wallpaperplugin=org.kde.image
+
+[Containments][29][Applets][30]
+immutability=1
+plugin=org.kde.plasma.kickoff
+
+[Containments][29][Applets][30][Configuration][General]
+favoritesPortedToKAstats=true
+icon=${icon_path}
+
+[Containments][29][Applets][31]
+immutability=1
+plugin=org.kde.plasma.appmenu
+
+[Containments][29][Applets][32]
+immutability=1
+plugin=org.kde.plasma.panelspacer
+
+[Containments][29][Applets][33]
+immutability=1
+plugin=org.kde.plasma.kickerdash
+
+[Containments][29][Applets][33][Configuration][General]
+icon=search
+
+[Containments][29][Applets][34]
+formfactor=2
+immutability=1
+lastScreen=0
+location=3
+plugin=org.kde.plasma.systemtray
+
+[Containments][29][Applets][45]
+immutability=1
+plugin=org.kde.plasma.digitalclock
+
+[Containments][29][General]
+AppletOrder=30;31;32;33;34;45
+
+[Containments][50]
+activityId=
+alignment=132
+formfactor=2
+immutability=1
+lastScreen=0
+lengthMode=2
+location=4
+plugin=org.kde.panel
+wallpaperplugin=org.kde.image
+
+[Containments][50][Applets][51]
+immutability=1
+plugin=org.kde.plasma.icontasks
+
+[Containments][50][Applets][51][Configuration][General]
+launchers=applications:org.kde.dolphin.desktop,applications:org.kde.konsole.desktop,applications:systemsettings.desktop,applications:org.kde.kate.desktop
+
+[Containments][50][General]
+AppletOrder=51
+EOF
+    chown "$REAL_USER:$REAL_USER" "$appletsrc"
+
+    # Desabilita override automático de tema do Kubuntu
+    as_user kwriteconfig6 --file kdeglobals --group KDE --key AutomaticLookAndFeel false
+
+    ok "Painéis configurados (top 44px + dock 56px centralizado) — efeito no próximo login"
 }
 
 configure_sddm() {
@@ -624,6 +672,8 @@ main() {
     apply_kde_config
     configure_sddm
     fix_apple_icons
+    setup_global_menu
+    replace_firefox_snap
     configure_top_panel
     cleanup
     print_summary
