@@ -362,18 +362,30 @@ FLAG="__FLAG_PATH__"
 # Ubuntu 26.04 usa qdbus6 (não qdbus)
 QDBUS="qdbus6"
 
-# Aguarda Plasma carregar completamente (máximo 60s)
-for i in $(seq 1 30); do
-    $QDBUS org.kde.plasmashell /PlasmaShell 2>/dev/null && break
+# Aguarda Plasma carregar (máximo 90s) e obtém DBUS da sessão gráfica
+# O systemd não herda DBUS_SESSION_BUS_ADDRESS — precisa descobrir manualmente
+for i in $(seq 1 45); do
     sleep 2
+    # Descobre DBUS_SESSION_BUS_ADDRESS da sessão plasmashell
+    PLASMA_PID=$(pgrep -u "$USER" plasmashell 2>/dev/null | head -1)
+    if [[ -n "$PLASMA_PID" ]]; then
+        DBUS_ADDR=$(cat /proc/"$PLASMA_PID"/environ 2>/dev/null \
+            | tr '\0' '\n' \
+            | grep DBUS_SESSION_BUS_ADDRESS \
+            | cut -d= -f2-)
+        if [[ -n "$DBUS_ADDR" ]]; then
+            export DBUS_SESSION_BUS_ADDRESS="$DBUS_ADDR"
+            # Testa se o evaluateScript responde de verdade
+            TEST=$($QDBUS org.kde.plasmashell /PlasmaShell evaluateScript "panels().length" 2>/dev/null)
+            [[ -n "$TEST" ]] && break
+        fi
+    fi
 done
-sleep 2
 
 # Desabilita override de tema automático do Kubuntu
 kwriteconfig6 --file kdeglobals --group KDE --key AutomaticLookAndFeel false
 
 # Cria painéis via Plasma JS API
-# IMPORTANTE: NÃO usar plasma-apply-lookandfeel aqui — reinicia plasmashell e reseta painéis
 $QDBUS org.kde.plasmashell /PlasmaShell evaluateScript "
 // Remove todos os painéis existentes (painel padrão Kubuntu)
 panels().forEach(function(p) { p.remove() })
