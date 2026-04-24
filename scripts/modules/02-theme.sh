@@ -634,6 +634,7 @@ floating=1
 thickness=44
 
 [PlasmaViews][Panel 50]
+floating=0
 panelLengthMode=1
 panelVisibility=1
 
