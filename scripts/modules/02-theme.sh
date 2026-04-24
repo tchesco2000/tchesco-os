@@ -149,14 +149,15 @@ clone_repos() {
 install_gtk_theme() {
     step "Instalando tema GTK WhiteSur"
 
-    # Instala para o sistema (/usr/share/themes) e para o usuário (~/.themes)
+    # Instala para o usuário (~/.themes) + libadwaita GTK4
     info "Instalando WhiteSur GTK (variante Light + Dark)..."
     as_user bash "$BUILD_DIR/whitesur-gtk/install.sh" \
         --dest "$REAL_HOME/.themes" \
         --name WhiteSur \
-        --theme all \
-        --color light dark \
-        --tweaks solid \
+        -c light \
+        -c dark \
+        -o solid \
+        -l \
         >> "$LOG_FILE" 2>&1
 
     ok "Tema GTK instalado em ~/.themes"
