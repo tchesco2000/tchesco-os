@@ -381,13 +381,13 @@ panels().forEach(function(p) { p.remove() })
 // ── BARRA SUPERIOR estilo macOS ──────────────────────────────────
 var top = new Panel
 top.location = 'top'
-top.height = 28
+top.height = 44
 top.hiding = 'none'
 
-// Logo horizontal Tchesco no lugar da maçã (maior e com o nome da distro)
+// Ícone T quadrado — escala bem com o painel de 44px, fica grande e visível
 var launcher = top.addWidget('org.kde.plasma.kickoff')
 launcher.currentConfigGroup = ['General']
-launcher.writeConfig('icon', 'tchesco-horizontal')
+launcher.writeConfig('icon', 'tchesco')
 
 // Global Menu: menus da app ativa aparecem na barra, igual ao macOS
 top.addWidget('org.kde.plasma.appmenu')
@@ -516,6 +516,56 @@ EOF
     ok "Plank configurado: centralizado, flutuante, com launchers"
 }
 
+configure_sddm() {
+    step "Configurando tela de login SDDM (Tchesco OS)"
+
+    local logo_src="$REPO_DIR/tchesco-logo-pack/tchesco-os/assets/logo/tchesco-logo-horizontal.svg"
+    local sddm_theme_dir="/usr/share/sddm/themes/kubuntu"
+
+    if [[ ! -f "$logo_src" ]]; then
+        warn "Logo não encontrado para SDDM — pulando"
+        return 0
+    fi
+
+    # Copia logo Tchesco para o tema SDDM
+    cp "$logo_src" "$sddm_theme_dir/tchesco-logo.svg"
+
+    # Sobrescreve o default-logo.svg do Kubuntu com o logo Tchesco
+    cp "$logo_src" "$sddm_theme_dir/default-logo.svg"
+
+    # Reconfigura o tema: cor escura Tchesco, sem fundo Kubuntu, logo visível
+    cat > "$sddm_theme_dir/theme.conf" << 'EOF'
+[General]
+showlogo=visible
+logo=/usr/share/sddm/themes/kubuntu/default-logo.svg
+type=color
+color=#0e1117
+fontSize=11
+background=
+needsFullUserModel=false
+showClock=true
+EOF
+
+    ok "Tela de login configurada com identidade Tchesco"
+}
+
+fix_apple_icons() {
+    step "Removendo ícones estilo Apple"
+
+    # Substitui o ícone do Dolphin no WhiteSur (que imita o Finder do macOS)
+    # pelo ícone de pasta padrão do Breeze (azul, sem referência à Apple)
+    local breeze_folder="/usr/share/icons/breeze/places/96/folder.svg"
+    local whitesur_dolphin="$REAL_HOME/.local/share/icons/WhiteSur/apps/scalable/org.kde.dolphin.svg"
+
+    if [[ -f "$breeze_folder" && -f "$whitesur_dolphin" ]]; then
+        cp "$breeze_folder" "$whitesur_dolphin"
+        chown "$REAL_USER:$REAL_USER" "$whitesur_dolphin"
+        ok "Ícone do Dolphin substituído (sem Finder Apple)"
+    else
+        warn "Ícone do Dolphin ou Breeze não encontrado — pulando"
+    fi
+}
+
 # ─── Limpeza ──────────────────────────────────────────────────────────────────
 
 cleanup() {
@@ -565,6 +615,8 @@ main() {
     install_plymouth
     install_tchesco_icon
     apply_kde_config
+    configure_sddm
+    fix_apple_icons
     configure_top_panel
     configure_plank
     cleanup
